@@ -1,9 +1,11 @@
 <?php
 use App\Auth;
+use App\Config;
 $currentUser = Auth::user();
 $isPremium = Auth::isPremium();
 $role = Auth::role();
 $currentUri = $_SERVER['REQUEST_URI'] ?? '/';
+$isDemoMode = Config::isDemoMode();
 ?>
 <!DOCTYPE html>
 <html lang="ms" class="dark">
@@ -157,7 +159,8 @@ $currentUri = $_SERVER['REQUEST_URI'] ?? '/';
                         </a>
                     <?php endif; ?>
 
-                    <!-- Quick Demo Account Switcher (Discreet Netflix styled pill) -->
+                    <!-- Quick Demo Account Switcher (Only visible in Staging/Demo mode) -->
+                    <?php if ($isDemoMode): ?>
                     <div class="relative" x-data="{ demoOpen: false }">
                         <button @click="demoOpen = !demoOpen" 
                                 class="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-white/10 hover:bg-white/15 text-slate-200 border border-white/10 flex items-center gap-1.5 transition-colors">
@@ -205,6 +208,7 @@ $currentUri = $_SERVER['REQUEST_URI'] ?? '/';
                             </div>
                         </div>
                     </div>
+                    <?php endif; ?>
 
                     <!-- Creator / Admin shortcut links -->
                     <?php if ($role === 'creator' || $role === 'admin'): ?>
@@ -307,41 +311,75 @@ $currentUri = $_SERVER['REQUEST_URI'] ?? '/';
         <?= $content ?>
     </main>
 
-    <!-- Netflix Style Minimal Footer -->
-    <footer class="mt-24 border-t border-white/[0.08] bg-[#0b0c0f] text-slate-500 text-xs py-12">
-        <div class="max-w-[1500px] mx-auto px-4 sm:px-8 lg:px-12 space-y-6">
-            <div class="flex items-center space-x-2">
-                <span class="font-['Bebas_Neue'] text-2xl tracking-wider text-[#E50914]">FILEMAI</span>
-                <span class="text-slate-600">|</span>
-                <span class="text-[11px] text-slate-400">Platform Penstriman Drama Mini Menegak</span>
+    <!-- Netflix Style Corporate Footer -->
+    <footer class="mt-24 border-t border-white/[0.08] bg-[#0b0c0f] text-slate-500 text-xs py-14">
+        <div class="max-w-[1500px] mx-auto px-4 sm:px-8 lg:px-12 space-y-10">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div class="flex items-center space-x-3">
+                    <span class="font-['Bebas_Neue'] text-3xl tracking-wider text-[#E50914]">FILEMAI</span>
+                    <span class="text-slate-600">|</span>
+                    <span class="text-xs text-slate-400 font-medium">Platform Penstriman Mini Drama Menegak Malaysia</span>
+                </div>
+                <div class="flex items-center gap-3 text-xs text-slate-400">
+                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[11px]">
+                        <i data-lucide="shield-check" class="w-3.5 h-3.5 text-emerald-400"></i>
+                        FPX &amp; Kad Diiktiraf Selamat
+                    </span>
+                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[11px]">
+                        <i data-lucide="smartphone" class="w-3.5 h-3.5 text-amber-400"></i>
+                        Format 9:16 Mudah Alih
+                    </span>
+                </div>
             </div>
 
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-6 text-[11px] text-slate-400">
-                <ul class="space-y-2">
-                    <li><a href="/" class="hover:text-white transition-colors">Laman Utama</a></li>
-                    <li><a href="/?genre=Romance" class="hover:text-white transition-colors">Drama Siri Romantik</a></li>
-                    <li><a href="/?genre=Action" class="hover:text-white transition-colors">Drama Aksi & Dendam</a></li>
-                </ul>
-                <ul class="space-y-2">
-                    <li><a href="/subscribe" class="text-amber-400 hover:text-amber-300">Pas VIP Bebas Iklan (RM5)</a></li>
-                    <li><a href="/creator" class="hover:text-white transition-colors">Creator Studio</a></li>
-                    <li><a href="/admin" class="hover:text-white transition-colors">Admin Panel</a></li>
-                </ul>
-                <ul class="space-y-2">
-                    <li><a href="/register?role=creator" class="hover:text-white transition-colors">Daftar Pembikin Filem</a></li>
-                    <li><a href="/login" class="hover:text-white transition-colors">Log Masuk Penonton</a></li>
-                    <li><a href="/subscribe/checkout" class="hover:text-white transition-colors">ToyyibPay FPX Gateway</a></li>
-                </ul>
-                <ul class="space-y-2">
-                    <li><span>MariaDB: <strong class="text-emerald-400">Tersambung</strong></span></li>
-                    <li><span>Enjin Iklan: <strong class="text-[#E50914]">15s Countdown</strong></span></li>
-                    <li><span>Format: <strong class="text-white">9:16 Menegak</strong></span></li>
-                </ul>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-8 text-[11px] text-slate-400">
+                <div class="space-y-3">
+                    <p class="font-bold text-white text-xs tracking-wider uppercase">Penerokaan</p>
+                    <ul class="space-y-2">
+                        <li><a href="/" class="hover:text-white transition-colors">Laman Utama</a></li>
+                        <li><a href="/?genre=Romance" class="hover:text-white transition-colors">Drama Siri Romantik</a></li>
+                        <li><a href="/?genre=Action" class="hover:text-white transition-colors">Drama Aksi &amp; Balas Dendam</a></li>
+                        <li><a href="/subscribe" class="text-amber-400 hover:text-amber-300 font-semibold">Pas VIP Tanpa Iklan (RM5)</a></li>
+                    </ul>
+                </div>
+                <div class="space-y-3">
+                    <p class="font-bold text-white text-xs tracking-wider uppercase">Bantuan &amp; Sokongan</p>
+                    <ul class="space-y-2">
+                        <li><a href="/faq" class="hover:text-white transition-colors">Soalan Lazim (FAQ)</a></li>
+                        <li><a href="/contact" class="hover:text-white transition-colors">Hubungi Kami</a></li>
+                        <li><a href="/subscribe" class="hover:text-white transition-colors">Panduan Langganan VIP</a></li>
+                        <li><a href="/contact" class="hover:text-white transition-colors">Maklum Balas Penstriman</a></li>
+                    </ul>
+                </div>
+                <div class="space-y-3">
+                    <p class="font-bold text-white text-xs tracking-wider uppercase">Undang-Undang &amp; Privasi</p>
+                    <ul class="space-y-2">
+                        <li><a href="/terms" class="hover:text-white transition-colors">Terma Penggunaan</a></li>
+                        <li><a href="/privacy" class="hover:text-white transition-colors">Polisi Privasi (PDPA)</a></li>
+                        <li><a href="/terms" class="hover:text-white transition-colors">Hak Cipta Kandungan</a></li>
+                        <li><a href="/terms" class="hover:text-white transition-colors">Garis Panduan Komuniti</a></li>
+                    </ul>
+                </div>
+                <div class="space-y-3">
+                    <p class="font-bold text-white text-xs tracking-wider uppercase">Pembikin Filem</p>
+                    <ul class="space-y-2">
+                        <li><a href="/register?role=creator" class="hover:text-white transition-colors">Daftar Akaun Creator</a></li>
+                        <li><a href="/creator" class="hover:text-white transition-colors">Creator Studio Portal</a></li>
+                        <li><a href="/contact" class="hover:text-white transition-colors">Perkongsian Hasil &amp; Tajaan</a></li>
+                        <li><a href="/login" class="hover:text-white transition-colors">Log Masuk Creator</a></li>
+                    </ul>
+                </div>
             </div>
 
-            <div class="border-t border-white/5 pt-6 flex flex-col sm:flex-row items-center justify-between text-slate-600 text-[11px]">
-                <p>&copy; <?= date('Y') ?> Filemai.my - Rekaan UI Netflix Berprestasi Tinggi. Hak Cipta Terpelihara.</p>
-                <p class="mt-2 sm:mt-0">Dikuasakan oleh PHP 8.4 & MariaDB.</p>
+            <div class="border-t border-white/5 pt-6 flex flex-col sm:flex-row items-center justify-between text-slate-500 text-[11px] gap-3">
+                <p>&copy; <?= date('Y') ?> Filemai.my. Hak Cipta Terpelihara. Filemai ialah platform penstriman mini drama menegak terulung.</p>
+                <div class="flex items-center gap-4 text-slate-500">
+                    <a href="/terms" class="hover:text-slate-300">Terma</a>
+                    <span>•</span>
+                    <a href="/privacy" class="hover:text-slate-300">Privasi</a>
+                    <span>•</span>
+                    <a href="/contact" class="hover:text-slate-300">Bantuan</a>
+                </div>
             </div>
         </div>
     </footer>

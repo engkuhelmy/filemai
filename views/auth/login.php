@@ -61,7 +61,8 @@
 
             </form>
 
-            <!-- Quick 1-Click Test Demo Switcher -->
+            <!-- Quick 1-Click Test Demo Switcher (Only visible in Staging/Demo mode) -->
+            <?php if (\App\Config::isDemoMode()): ?>
             <div class="pt-4 border-t border-white/10 space-y-2.5">
                 <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider text-center">
                     Uji Pantas (1-Klik Log Masuk Demo):
@@ -81,6 +82,7 @@
                     </a>
                 </div>
             </div>
+            <?php endif; ?>
 
             <div class="text-center text-xs text-slate-400 pt-2">
                 Baru di Filemai? 

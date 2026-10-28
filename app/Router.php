@@ -18,14 +18,16 @@ class Router
 
     public static function dispatch(): void
     {
+        self::enforceHttps();
+
         $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
-        $uri = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
-        $uri = rtrim($uri, '/');
-        if ($uri === '') {
-            $uri = '/';
+        if ($method === 'HEAD') {
+            $routesForMethod = self::$routes['GET'] ?? [];
+        } else {
+            $routesForMethod = self::$routes[$method] ?? [];
         }
 
-        $routesForMethod = self::$routes[$method] ?? [];
+        $uri = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
 
         foreach ($routesForMethod as $routePath => $handler) {
             $pattern = self::convertRouteToRegex($routePath);
@@ -95,5 +97,30 @@ class Router
     {
         header("Location: $url");
         exit;
+    }
+
+    public static function enforceHttps(): void
+    {
+        $host = $_SERVER['HTTP_HOST'] ?? '';
+        // Skip enforcement on local IP / CLI development
+        if (empty($host) || str_contains($host, 'localhost') || str_contains($host, '127.0.0.1')) {
+            return;
+        }
+
+        // Detect if request is HTTPS
+        $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+            || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower($_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https')
+            || (isset($_SERVER['HTTP_CF_VISITOR']) && str_contains($_SERVER['HTTP_CF_VISITOR'], '"scheme":"https"'))
+            || (isset($_SERVER['SERVER_PORT']) && (int)$_SERVER['SERVER_PORT'] === 443);
+
+        if (!$isHttps) {
+            $uri = $_SERVER['REQUEST_URI'] ?? '/';
+            $secureUrl = 'https://' . $host . $uri;
+            header("Location: $secureUrl", true, 301);
+            exit;
+        }
+
+        // Send HSTS header on secure connections
+        header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
     }
 }

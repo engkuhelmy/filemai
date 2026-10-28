@@ -3,6 +3,7 @@
 namespace App\Controllers;
 
 use App\Auth;
+use App\Config;
 use App\Database;
 use App\Router;
 
@@ -82,6 +83,12 @@ class AuthController
 
     public function demoSwitch(string $userId): void
     {
+        if (!Config::isDemoMode()) {
+            $_SESSION['error'] = 'Fungsi akaun demo hanya aktif di bawah persekitaran staging/demo.';
+            Router::redirect('/login');
+            return;
+        }
+
         $id = (int)$userId;
         if (Auth::loginById($id)) {
             $user = Auth::user();

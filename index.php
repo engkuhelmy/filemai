@@ -4,6 +4,15 @@
  * Dikuasakan oleh PHP 8.4, MariaDB & Nginx
  */
 
+// If running under PHP built-in CLI server, serve static files directly
+if (php_sapi_name() === 'cli-server') {
+    $uriPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
+    $filePath = __DIR__ . $uriPath;
+    if ($uriPath !== '/' && file_exists($filePath) && !is_dir($filePath)) {
+        return false;
+    }
+}
+
 // Simple PSR-4 Autoloader for App namespace
 spl_autoload_register(function ($class) {
     $prefix = 'App\\';
@@ -32,6 +41,7 @@ use App\Controllers\CreatorController;
 use App\Controllers\AdminController;
 use App\Controllers\AuthController;
 use App\Controllers\ApiController;
+use App\Controllers\PageController;
 
 Auth::start();
 
@@ -46,6 +56,13 @@ Router::get('/subscribe/checkout', [SubscriptionController::class, 'checkout']);
 Router::post('/subscribe/process', [SubscriptionController::class, 'process']);
 Router::get('/subscribe/success', [SubscriptionController::class, 'success']);
 Router::post('/webhook/payment', [SubscriptionController::class, 'webhook']);
+
+// Corporate & Support Pages
+Router::get('/terms', [PageController::class, 'terms']);
+Router::get('/privacy', [PageController::class, 'privacy']);
+Router::get('/contact', [PageController::class, 'contact']);
+Router::post('/contact', [PageController::class, 'contact']);
+Router::get('/faq', [PageController::class, 'faq']);
 
 // -------------------------------------------------------------
 // Auth & Demo Switcher Routes

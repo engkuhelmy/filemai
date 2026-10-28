@@ -1,94 +1,133 @@
 <?php
-$featured = $heroDramas[0] ?? null;
+$featured = $heroDramas[0] ?? [
+    'id' => 2,
+    'title' => 'Dendam Pewaris Yang Dibuang',
+    'slug' => 'dendam-pewaris-yang-dibuang',
+    'synopsis' => 'Dibuang oleh keluarga konglomeratnya 10 tahun lalu dan dihina sebagai pengemis jalanan. Kini, sang naga tidur bangkit kembali sebagai penguasa kewangan global terkuat untuk menuntut setiap titis air mata dan maruah yang telah dirampas!',
+    'poster_url' => '/uploads/posters/dendam-pewaris.jpg',
+    'banner_url' => '/uploads/posters/dendam-billboard.jpg',
+    'trailer_url' => '/uploads/videos/sample_reel.mp4',
+    'genre' => 'Action',
+    'episode_count' => 3,
+    'first_episode_id' => 5,
+    'views_count' => 28922,
+    'rating' => '8.9',
+    'hook' => '🔥 #1 Paling Trending di Malaysia',
+];
 ?>
 
 <div class="space-y-10 pb-16" x-data="netflixHome(<?= htmlspecialchars(json_encode($heroDramas), ENT_QUOTES, 'UTF-8') ?>)">
 
     <!-- ======================================================== -->
-    <!-- NETFLIX HERO BILLBOARD SECTION -->
+    <!-- NETFLIX HERO BILLBOARD SECTION WITH 5S TRAILER TEASER -->
     <!-- ======================================================== -->
     <div class="relative w-full h-[75vh] sm:h-[82vh] lg:h-[88vh] min-h-[520px] max-h-[900px] overflow-hidden select-none">
         
-        <!-- Hero Background Banner Image (Dynamic via Alpine.js carousel) -->
-        <template x-for="(hero, index) in heroList" :key="hero.id">
-            <div x-show="currentIndex === index" 
-                 x-transition:enter="transition ease-out duration-700"
-                 x-transition:enter-start="opacity-0 scale-105"
-                 x-transition:enter-end="opacity-100 scale-100"
-                 x-transition:leave="transition ease-in duration-500"
-                 x-transition:leave-start="opacity-100"
-                 x-transition:leave-end="opacity-0"
-                 class="absolute inset-0 z-0">
-                
-                <img :src="hero.banner_url || '/uploads/posters/ceo-billboard.jpg'" 
-                     :alt="hero.title" 
-                     class="w-full h-full object-cover object-center sm:object-top">
-                
-                <!-- Netflix Left Vignette Gradient -->
-                <div class="absolute inset-0 bg-gradient-to-r from-[#0b0c0f] via-[#0b0c0f]/80 sm:via-[#0b0c0f]/60 to-transparent"></div>
-                
-                <!-- Netflix Bottom Fade to Dark -->
-                <div class="absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-[#0b0c0f] via-[#0b0c0f]/70 to-transparent"></div>
-            </div>
-        </template>
+        <!-- Background Media Layer: 5-Second Video Trailer Teaser + High-Res Billboard Poster Fallback -->
+        <div class="absolute inset-0 z-0">
+            <!-- 5s Auto-play Muted Video Trailer Teaser -->
+            <video x-ref="trailerVideo"
+                   autoplay muted playsinline
+                   :src="currentHero?.trailer_url || '/uploads/videos/sample_reel.mp4'"
+                   class="w-full h-full object-cover object-center absolute inset-0 transition-opacity duration-1000"
+                   :class="trailerActive ? 'opacity-85' : 'opacity-0'">
+            </video>
 
-        <!-- Hero Content Overlay (Left Aligned matching screenshot) -->
+            <!-- High-Res Billboard Poster (Crossfades seamlessly when teaser completes) -->
+            <img :src="currentHero?.banner_url || '<?= htmlspecialchars($featured['banner_url']) ?>'" 
+                 :alt="currentHero?.title || '<?= htmlspecialchars($featured['title']) ?>'" 
+                 class="w-full h-full object-cover object-center sm:object-top transition-opacity duration-1000"
+                 :class="trailerActive ? 'opacity-30' : 'opacity-100'">
+            
+            <!-- Netflix Cinematic Vignette Gradients -->
+            <div class="absolute inset-0 bg-gradient-to-r from-[#0b0c0f] via-[#0b0c0f]/85 sm:via-[#0b0c0f]/60 to-transparent"></div>
+            <div class="absolute inset-x-0 bottom-0 h-52 bg-gradient-to-t from-[#0b0c0f] via-[#0b0c0f]/80 to-transparent"></div>
+        </div>
+
+        <!-- 5-Second Trailer Teaser Pill (Top Right) -->
+        <div class="absolute top-24 right-4 sm:right-12 z-20">
+            <div x-show="trailerActive" x-transition.opacity.duration.300ms class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-md border border-white/15 text-[11px] font-bold text-white shadow-xl">
+                <span class="w-2 h-2 rounded-full bg-[#E50914] animate-ping"></span>
+                <span>Trailer Teaser (<span x-text="trailerCountdown">5</span>s)</span>
+                <button @click="toggleMute()" class="p-1 hover:text-red-400 text-slate-300 transition-colors">
+                    <i :data-lucide="isMuted ? 'volume-x' : 'volume-2'" class="w-3.5 h-3.5"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Hero Content Overlay (SSR Pre-rendered with Dynamic Alpine.js updates) -->
         <div class="relative z-10 max-w-[1500px] mx-auto px-4 sm:px-8 lg:px-12 h-full flex flex-col justify-center pt-16 sm:pt-20">
             
-            <div class="max-w-2xl space-y-4 sm:space-y-5" x-show="currentHero">
+            <div class="max-w-2xl space-y-4 sm:space-y-5">
                 
-                <!-- Duration & Season/Episode details row -->
+                <!-- Hook Badge & Duration Row -->
                 <div class="space-y-1.5 text-xs sm:text-sm text-slate-300 font-medium">
                     <div class="flex items-center gap-2 text-slate-400">
-                        <span>Duration: <strong class="text-white" x-text="(currentHero?.episode_count || 4) + ' Episod'"></strong></span>
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-[#E50914]/20 border border-[#E50914]/40 text-[#E50914] font-black text-[11px] uppercase tracking-wider"
+                              x-text="currentHero?.hook || '<?= htmlspecialchars($featured['hook'] ?? '🔥 #1 Paling Trending di Malaysia') ?>'">
+                            <?= htmlspecialchars($featured['hook'] ?? '🔥 #1 Paling Trending di Malaysia') ?>
+                        </span>
+                        <span>•</span>
+                        <span>Duration: <strong class="text-white" x-text="(currentHero?.episode_count || <?= (int)($featured['episode_count'] ?? 3) ?>) + ' Episod'"><?= (int)($featured['episode_count'] ?? 3) ?> Episod</strong></span>
                     </div>
 
                     <div class="flex items-center gap-2.5 text-xs text-slate-300">
                         <span class="flex items-center gap-1 text-amber-400 font-extrabold">
                             <i data-lucide="star" class="w-3.5 h-3.5 fill-amber-400"></i>
-                            <span>7.5</span>
+                            <span x-text="currentHero?.rating || '<?= htmlspecialchars($featured['rating'] ?? '8.9') ?>'"><?= htmlspecialchars($featured['rating'] ?? '8.9') ?></span>
                         </span>
                         <span class="text-slate-500">•</span>
-                        <span class="text-slate-300">Season 1 • Episode 1 •</span>
-                        <span class="text-slate-400 italic" x-text="currentHero?.genre || 'Drama'"></span>
+                        <span class="text-slate-300">Season 1 • Full HD •</span>
+                        <span class="text-slate-200 font-bold" x-text="currentHero?.genre || '<?= htmlspecialchars($featured['genre'] ?? 'Action') ?>'"><?= htmlspecialchars($featured['genre'] ?? 'Action') ?></span>
                     </div>
                 </div>
 
                 <!-- Big Title (Netflix bold uppercase font) -->
                 <h1 class="text-3xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight leading-tight uppercase font-['Bebas_Neue','Inter',sans-serif]"
                     x-text="currentHero?.title">
+                    <?= htmlspecialchars($featured['title'] ?? 'Dendam Pewaris Yang Dibuang') ?>
                 </h1>
 
-                <!-- Synopsis Text -->
-                <p class="text-xs sm:text-sm text-slate-300 leading-relaxed line-clamp-3 max-w-xl"
+                <!-- Synopsis Text (Emotionally Hooking) -->
+                <p class="text-xs sm:text-sm text-slate-200 leading-relaxed line-clamp-3 max-w-xl font-medium"
                    x-text="currentHero?.synopsis">
+                    <?= htmlspecialchars($featured['synopsis'] ?? 'Dibuang oleh keluarga konglomeratnya 10 tahun lalu dan dihina sebagai pengemis jalanan. Kini, sang naga tidur bangkit kembali sebagai penguasa kewangan global terkuat untuk menuntut setiap titis air mata dan maruah yang telah dirampas!') ?>
                 </p>
 
-                <!-- Netflix Red Watch & Add List Buttons -->
+                <!-- Netflix Red Watch & Info Buttons -->
                 <div class="flex items-center gap-3 pt-2 sm:pt-4">
                     
-                    <!-- Red Watch Button (▶ WATCH) -->
-                    <a :href="'/watch/' + (currentHero?.first_episode_id || 1)" 
+                    <!-- Red Watch Button (▶ WATCH NOW) -->
+                    <a :href="'/watch/' + (currentHero?.first_episode_id || <?= (int)($featured['first_episode_id'] ?? 1) ?>)" 
+                       href="/watch/<?= (int)($featured['first_episode_id'] ?? 1) ?>"
                        class="px-6 sm:px-8 py-3 sm:py-3.5 rounded-full bg-[#E50914] hover:bg-[#F40612] text-white font-extrabold text-xs sm:text-sm flex items-center gap-2.5 shadow-xl shadow-red-950/60 hover:scale-105 transition-all">
                         <i data-lucide="play" class="w-4 h-4 fill-white"></i>
-                        <span>WATCH</span>
+                        <span>WATCH NOW</span>
                     </a>
 
-                    <!-- Translucent Add List Button (+ ADD LIST) -->
-                    <a :href="'/drama/' + (currentHero?.slug || '')" 
-                       class="px-5 sm:px-6 py-3 sm:py-3.5 rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-md text-white font-bold text-xs sm:text-sm border border-white/20 flex items-center gap-2 transition-all">
-                        <i data-lucide="plus" class="w-4 h-4"></i>
-                        <span>ADD LIST</span>
+                    <!-- Translucent Details Button (+ INFO PENUH) -->
+                    <a :href="'/drama/' + (currentHero?.slug || '<?= htmlspecialchars($featured['slug'] ?? '') ?>')" 
+                       href="/drama/<?= htmlspecialchars($featured['slug'] ?? 'dendam-pewaris-yang-dibuang') ?>"
+                       class="px-5 sm:px-6 py-3 sm:py-3.5 rounded-full bg-white/15 hover:bg-white/25 backdrop-blur-md text-white font-bold text-xs sm:text-sm border border-white/20 flex items-center gap-2 transition-all">
+                        <i data-lucide="info" class="w-4 h-4"></i>
+                        <span>INFO PENUH</span>
                     </a>
+
+                    <!-- Replay Teaser Button -->
+                    <button @click="replayTeaser()" 
+                            title="Main Semula Teaser"
+                            class="p-3 sm:p-3.5 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md text-slate-300 hover:text-white border border-white/10 transition-colors">
+                        <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+                    </button>
 
                 </div>
 
             </div>
 
-            <!-- Bottom Center Carousel Indicators (matching screenshot) -->
+            <!-- Bottom Center Carousel Indicators -->
             <div class="absolute bottom-6 sm:bottom-10 left-1/2 transform -translate-x-1/2 z-20 flex items-center gap-2">
                 <template x-for="(hero, index) in heroList" :key="'indicator-' + hero.id">
-                    <button @click="currentIndex = index" 
+                    <button @click="switchHero(index)" 
                             class="h-1 rounded-full transition-all duration-300"
                             :class="currentIndex === index ? 'w-8 bg-[#E50914]' : 'w-3 bg-white/30 hover:bg-white/60'">
                     </button>
@@ -372,25 +411,69 @@ $featured = $heroDramas[0] ?? null;
 
 </div>
 
-<!-- Alpine.js Carousel Data Handler -->
+<!-- Alpine.js Carousel & 5s Trailer Teaser Handler -->
 <script>
     function netflixHome(heroList) {
         return {
             heroList: heroList || [],
             currentIndex: 0,
             timer: null,
+            trailerActive: true,
+            trailerCountdown: 5,
+            countdownInterval: null,
+            isMuted: true,
 
             get currentHero() {
                 return this.heroList[this.currentIndex] || this.heroList[0] || null;
             },
 
             init() {
+                this.startTeaser();
+
                 if (this.heroList.length > 1) {
                     this.timer = setInterval(() => {
-                        this.currentIndex = (this.currentIndex + 1) % this.heroList.length;
-                    }, 6500);
+                        this.switchHero((this.currentIndex + 1) % this.heroList.length);
+                    }, 8500);
                 }
                 this.$nextTick(() => lucide.createIcons());
+            },
+
+            startTeaser() {
+                this.trailerActive = true;
+                this.trailerCountdown = 5;
+                clearInterval(this.countdownInterval);
+
+                if (this.$refs.trailerVideo) {
+                    this.$refs.trailerVideo.currentTime = 0;
+                    this.$refs.trailerVideo.play().catch(() => {});
+                }
+
+                this.countdownInterval = setInterval(() => {
+                    if (this.trailerCountdown > 1) {
+                        this.trailerCountdown--;
+                    } else {
+                        this.trailerActive = false;
+                        clearInterval(this.countdownInterval);
+                    }
+                }, 1000);
+            },
+
+            replayTeaser() {
+                this.startTeaser();
+            },
+
+            switchHero(index) {
+                this.currentIndex = index;
+                this.startTeaser();
+                this.$nextTick(() => lucide.createIcons());
+            },
+
+            toggleMute() {
+                if (this.$refs.trailerVideo) {
+                    this.isMuted = !this.isMuted;
+                    this.$refs.trailerVideo.muted = this.isMuted;
+                    this.$nextTick(() => lucide.createIcons());
+                }
             }
         }
     }
