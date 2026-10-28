@@ -15,6 +15,15 @@ $isDemoMode = Config::isDemoMode();
     <title><?= htmlspecialchars($title ?? 'Filemai - Platform Drama Menegak') ?></title>
     <meta name="description" content="Tonton siri mini drama menegak terbaik tempatan dengan paparan ala Netflix. Nikmati percuma dengan iklan pendek atau langgan VIP RM5/bulan.">
     
+    <!-- Progressive Web App (PWA) Meta & Manifest -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#E50914">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Filemai">
+    <link rel="apple-touch-icon" href="/assets/icons/icon-192.png">
+    
     <!-- Google Fonts: Bebas Neue (Netflix style titles) & Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -427,10 +436,68 @@ $isDemoMode = Config::isDemoMode();
         <?php endif; ?>
     </div>
 
-    <!-- Initialize Lucide Icons -->
+    <!-- Mobile PWA Install Prompt Banner -->
+    <div id="pwaInstallBanner" 
+         class="hidden fixed bottom-16 md:bottom-6 left-4 right-4 sm:left-auto sm:right-6 sm:max-w-sm z-50 p-4 rounded-2xl bg-[#141414]/95 backdrop-blur-xl border border-[#E50914]/40 shadow-2xl text-white">
+        <div class="flex items-start gap-3">
+            <img src="/assets/icons/icon-192.png" alt="Filemai" class="w-11 h-11 rounded-xl shadow-md border border-white/10 shrink-0">
+            <div class="flex-1 min-w-0">
+                <h4 class="text-xs font-bold text-white">Pasang Aplikasi Filemai</h4>
+                <p class="text-[11px] text-slate-300 leading-snug mt-0.5">Tonton mini drama menegak secara skrin penuh tanpa address bar browser.</p>
+                <div class="flex items-center gap-2 mt-2.5">
+                    <button id="pwaInstallBtn" class="px-3.5 py-1.5 rounded-full bg-[#E50914] hover:bg-[#F40612] text-white text-[11px] font-extrabold shadow-md shadow-red-950/80 transition-all flex items-center gap-1">
+                        <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                        Tambah ke Skrin
+                    </button>
+                    <button id="pwaCloseBtn" class="px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 text-[11px] font-semibold transition-colors">
+                        Nanti
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Initialize Lucide Icons & PWA Service Worker -->
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             lucide.createIcons();
+
+            // Register PWA Service Worker
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('/sw.js').then((reg) => {
+                    console.log('✅ Filemai PWA Service Worker registered');
+                }).catch((err) => {
+                    console.warn('PWA registration failed:', err);
+                });
+            }
+
+            // PWA Install Prompt Banner Logic
+            let deferredPrompt = null;
+            window.addEventListener('beforeinstallprompt', (e) => {
+                e.preventDefault();
+                deferredPrompt = e;
+                if (!localStorage.getItem('pwaDismissed')) {
+                    const banner = document.getElementById('pwaInstallBanner');
+                    if (banner) {
+                        banner.classList.remove('hidden');
+                        lucide.createIcons();
+                    }
+                }
+            });
+
+            document.getElementById('pwaInstallBtn')?.addEventListener('click', async () => {
+                if (deferredPrompt) {
+                    deferredPrompt.prompt();
+                    const { outcome } = await deferredPrompt.userChoice;
+                    deferredPrompt = null;
+                    document.getElementById('pwaInstallBanner')?.classList.add('hidden');
+                }
+            });
+
+            document.getElementById('pwaCloseBtn')?.addEventListener('click', () => {
+                document.getElementById('pwaInstallBanner')?.classList.add('hidden');
+                localStorage.setItem('pwaDismissed', '1');
+            });
         });
     </script>
 </body>

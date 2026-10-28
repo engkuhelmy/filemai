@@ -47,6 +47,17 @@ class WatchController
             }
         }
 
+        // Attach HLS Adaptive Bitrate Stream URL if available
+        $hlsFile = dirname(__DIR__, 2) . '/uploads/videos/hls/ep.m3u8';
+        $hasHls = file_exists($hlsFile);
+        $episode['hls_url'] = $hasHls ? '/uploads/videos/hls/ep.m3u8' : null;
+        if ($nextEpisode) {
+            $nextEpisode['hls_url'] = $hasHls ? '/uploads/videos/hls/ep.m3u8' : null;
+        }
+        if ($prevEpisode) {
+            $prevEpisode['hls_url'] = $hasHls ? '/uploads/videos/hls/ep.m3u8' : null;
+        }
+
         // Interstitial Ad Logic
         $isPremium = Auth::isPremium();
         $ad = null;

@@ -8,6 +8,7 @@ vendor/
 
 # Large media files
 uploads/videos/sample_reel.mp4
+uploads/videos/hls/*.ts
 
 # OS
 .DS_Store

@@ -1,0 +1,40 @@
+{
+  "name": "Filemai - Mini Drama Menegak",
+  "short_name": "Filemai",
+  "description": "Platform Penstriman Mini Drama Menegak No. 1 Malaysia",
+  "start_url": "/",
+  "id": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b0c0f",
+  "theme_color": "#E50914",
+  "lang": "ms",
+  "categories": ["entertainment", "video"],
+  "icons": [
+    {
+      "src": "/assets/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/assets/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Siri Trending",
+      "url": "/?tab=trends",
+      "icons": [{ "src": "/assets/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Pas VIP RM5",
+      "url": "/subscribe",
+      "icons": [{ "src": "/assets/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}
