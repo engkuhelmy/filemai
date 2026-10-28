@@ -1,0 +1,14 @@
+# Composer
+composer.phar
+vendor/
+
+# Environment / local configs
+.env
+*.log
+
+# Large media files
+uploads/videos/sample_reel.mp4
+
+# OS
+.DS_Store
+Thumbs.db
