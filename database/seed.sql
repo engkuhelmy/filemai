@@ -25,11 +25,12 @@ INSERT INTO dramas (id, creator_id, title, slug, synopsis, poster_url, banner_ur
 (4, 3, 'Keluarga Mertua Dari Neraka', 'keluarga-mertua-dari-neraka', 'Drama realiti kekeluargaan tentang cabaran seorang menantu berdepan kerenah ibu mertua dan ipar duai yang tidak pernah berpuas hati.', '/uploads/posters/jodoh-kontrak-ceo.jpg', '/uploads/posters/jodoh-kontrak-ceo.jpg', 'Drama', 'series', 'pending', 0, 0);
 
 -- Episodes for Drama 1 (Jodoh Kontrak CEO)
-INSERT INTO episodes (drama_id, episode_number, title, video_url, duration, views_count, is_free_preview) VALUES
-(1, 1, 'Episod 1: Pertemuan Tak Sengaja di Lif Korporat', '/uploads/videos/ep1.mp4', 75, 5820, 1),
-(1, 2, 'Episod 2: Syarat Perkahwinan Rahsia RM1 Juta', '/uploads/videos/ep2.mp4', 82, 4210, 1),
-(1, 3, 'Episod 3: Bekas Kekasih Menagih Kasih', '/uploads/videos/ep3.mp4', 68, 3110, 0),
-(1, 4, 'Episod 4: Cemburu Sang Jutawan', '/uploads/videos/ep1.mp4', 90, 2280, 0);
+INSERT INTO episodes (drama_id, episode_number, title, video_source, youtube_video_id, video_url, duration, views_count, is_free_preview) VALUES
+(1, 1, 'Episod 1: Pertemuan Tak Sengaja di Lif Korporat', 'direct', NULL, '/uploads/videos/ep1.mp4', 75, 5820, 1),
+(1, 2, 'Episod 2: Syarat Perkahwinan Rahsia RM1 Juta', 'direct', NULL, '/uploads/videos/ep2.mp4', 82, 4210, 1),
+(1, 3, 'Episod 3: Bekas Kekasih Menagih Kasih', 'direct', NULL, '/uploads/videos/ep3.mp4', 68, 3110, 0),
+(1, 4, 'Episod 4: Cemburu Sang Jutawan', 'direct', NULL, '/uploads/videos/ep1.mp4', 90, 2280, 0),
+(1, 5, 'Episod 5: Rahsia Terbongkar di YouTube', 'youtube', 'dGvl1unot9Q', 'https://www.youtube.com/watch?v=dGvl1unot9Q', 60, 1500, 0);
 
 -- Episodes for Drama 2 (Dendam Pewaris)
 INSERT INTO episodes (drama_id, episode_number, title, video_url, duration, views_count, is_free_preview) VALUES

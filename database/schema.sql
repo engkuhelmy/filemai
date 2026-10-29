@@ -36,12 +36,15 @@ CREATE TABLE IF NOT EXISTS episodes (
     drama_id BIGINT UNSIGNED NOT NULL,
     episode_number INT NOT NULL,
     title VARCHAR(255) NOT NULL,
-    video_url VARCHAR(500) NOT NULL,
+    video_source ENUM('youtube', 'direct') NOT NULL DEFAULT 'youtube',
+    youtube_video_id VARCHAR(20) NULL,
+    video_url VARCHAR(500) NULL,
     duration INT NULL DEFAULT 60,
     views_count BIGINT UNSIGNED DEFAULT 0,
     is_free_preview BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_drama_episode (drama_id, episode_number),
     FOREIGN KEY (drama_id) REFERENCES dramas(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
