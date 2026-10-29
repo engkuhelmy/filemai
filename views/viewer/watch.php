@@ -591,16 +591,44 @@
                 initYouTube() {
                     if (!this.youtubeVideoId) return;
 
-                    // By default, YouTube embed autoplays muted
+                    // By default, YouTube embed autoplays muted via iframe src params
                     this.isMuted = true;
+                    this.isPlaying = true; // Assume playing since autoplay=1&mute=1 in src
 
-                    const bindYT = () => {
+                    // Listen for YouTube postMessage events (works without YT.Player API)
+                    const ytMsgHandler = (e) => {
+                        try {
+                            const data = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
+                            if (data && data.event === 'onStateChange') {
+                                const state = data.info;
+                                if (state === 1) { this.isPlaying = true; }       // PLAYING
+                                else if (state === 2) { this.isPlaying = false; } // PAUSED
+                                else if (state === 0) {                            // ENDED
+                                    this.isPlaying = false;
+                                    this.onVideoEnded();
+                                }
+                            }
+                            if (data && data.event === 'onReady') {
+                                this.isPlaying = true;
+                            }
+                        } catch (err) { /* ignore non-YT messages */ }
+                    };
+                    window.addEventListener('message', ytMsgHandler);
+
+                    // Try to bind YT.Player API for richer control (pause/unmute)
+                    // IMPORTANT: Only bind events to existing iframe, do NOT pass videoId
+                    // (passing videoId would replace the iframe and break autoplay)
+                    const tryBindYTApi = () => {
                         if (window.YT && window.YT.Player) {
+                            const iframe = document.getElementById('ytPlayerFrame');
+                            if (!iframe || iframe.tagName !== 'IFRAME') return; // safety check
                             try {
-                                this.ytPlayer = new YT.Player('ytPlayerFrame', {
+                                this.ytPlayer = new YT.Player(iframe, {
                                     events: {
                                         'onReady': (event) => {
                                             this.isPlaying = true;
+                                            // Store reference to actual iframe API object
+                                            this.ytPlayer = event.target;
                                         },
                                         'onStateChange': (event) => {
                                             if (event.data === YT.PlayerState.PLAYING) {
@@ -615,14 +643,14 @@
                                     }
                                 });
                             } catch (e) {
-                                console.warn('YouTube Player API binding:', e);
+                                console.warn('YouTube Player API binding failed (using postMessage fallback):', e);
                             }
                         } else {
-                            setTimeout(bindYT, 150);
+                            // YT API not loaded yet, retry
+                            setTimeout(tryBindYTApi, 200);
                         }
                     };
-
-                    bindYT();
+                    tryBindYTApi();
                 },
 
                 initDirectVideo(video) {
