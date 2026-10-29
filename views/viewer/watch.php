@@ -126,9 +126,20 @@
             
             <!-- Source 1: YouTube IFrame Player API Container -->
             <div x-show="videoSource === 'youtube'" 
-                 class="absolute inset-0 w-full h-full z-0 yt-iframe-container bg-black"
+                 class="absolute inset-0 w-full h-full z-0 yt-iframe-container bg-black flex items-center justify-center overflow-hidden"
                  id="ytContainer">
-                <div id="ytPlayerFrame" class="w-full h-full"></div>
+                <?php if (($episode['video_source'] ?? '') === 'youtube' && !empty($episode['youtube_video_id'])): ?>
+                    <iframe id="ytPlayerFrame" 
+                            class="w-full h-full border-0 absolute inset-0"
+                            src="https://www.youtube-nocookie.com/embed/<?= htmlspecialchars($episode['youtube_video_id']) ?>?enablejsapi=1&autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1&controls=1"
+                            title="<?= htmlspecialchars($episode['title']) ?>"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                            referrerpolicy="strict-origin-when-cross-origin"
+                            allowfullscreen>
+                    </iframe>
+                <?php else: ?>
+                    <div id="ytPlayerFrame" class="w-full h-full"></div>
+                <?php endif; ?>
             </div>
 
             <!-- Source 2: Direct MP4 / Adaptive HLS Video Element -->
@@ -143,11 +154,13 @@
                    @click="togglePlay"
                    @timeupdate="onTimeUpdate"
                    @ended="onVideoEnded">
-                <?php if (!empty($episode['hls_url'])): ?>
-                    <source src="<?= htmlspecialchars($episode['hls_url']) ?>" type="application/x-mpegURL">
-                <?php endif; ?>
-                <?php if (!empty($episode['video_url'])): ?>
-                    <source src="<?= htmlspecialchars($episode['video_url']) ?>" type="video/mp4">
+                <?php if (($episode['video_source'] ?? 'direct') === 'direct'): ?>
+                    <?php if (!empty($episode['hls_url'])): ?>
+                        <source src="<?= htmlspecialchars($episode['hls_url']) ?>" type="application/x-mpegURL">
+                    <?php endif; ?>
+                    <?php if (!empty($episode['video_url'])): ?>
+                        <source src="<?= htmlspecialchars($episode['video_url']) ?>" type="video/mp4">
+                    <?php endif; ?>
                 <?php endif; ?>
             </video>
 
@@ -192,7 +205,7 @@
             </div>
 
             <!-- Floating Unmute Button if Autoplay was forced Muted by Browser Policy -->
-            <button x-show="videoSource === 'direct' && isMuted && isPlaying"
+            <button x-show="isMuted && (isPlaying || videoSource === 'youtube')"
                     @click.stop="unmute()"
                     class="absolute top-20 right-4 z-30 px-3 py-1.5 rounded-full bg-black/80 backdrop-blur-md border border-white/20 text-white text-[11px] font-bold flex items-center gap-1.5 shadow-xl hover:bg-black transition-all animate-pulse"
                     style="display: none;">
@@ -578,43 +591,38 @@
                 initYouTube() {
                     if (!this.youtubeVideoId) return;
 
-                    const mountYT = () => {
+                    // By default, YouTube embed autoplays muted
+                    this.isMuted = true;
+
+                    const bindYT = () => {
                         if (window.YT && window.YT.Player) {
-                            this.ytPlayer = new YT.Player('ytPlayerFrame', {
-                                videoId: this.youtubeVideoId,
-                                playerVars: {
-                                    playsinline: 1,
-                                    rel: 0,
-                                    modestbranding: 1,
-                                    autoplay: 1,
-                                    controls: 1,
-                                    enablejsapi: 1,
-                                    fs: 1,
-                                    origin: window.location.origin
-                                },
-                                events: {
-                                    'onReady': (event) => {
-                                        this.isPlaying = true;
-                                        event.target.playVideo();
-                                    },
-                                    'onStateChange': (event) => {
-                                        if (event.data === YT.PlayerState.PLAYING) {
+                            try {
+                                this.ytPlayer = new YT.Player('ytPlayerFrame', {
+                                    events: {
+                                        'onReady': (event) => {
                                             this.isPlaying = true;
-                                        } else if (event.data === YT.PlayerState.PAUSED) {
-                                            this.isPlaying = false;
-                                        } else if (event.data === YT.PlayerState.ENDED) {
-                                            this.isPlaying = false;
-                                            this.onVideoEnded();
+                                        },
+                                        'onStateChange': (event) => {
+                                            if (event.data === YT.PlayerState.PLAYING) {
+                                                this.isPlaying = true;
+                                            } else if (event.data === YT.PlayerState.PAUSED) {
+                                                this.isPlaying = false;
+                                            } else if (event.data === YT.PlayerState.ENDED) {
+                                                this.isPlaying = false;
+                                                this.onVideoEnded();
+                                            }
                                         }
                                     }
-                                }
-                            });
+                                });
+                            } catch (e) {
+                                console.warn('YouTube Player API binding:', e);
+                            }
                         } else {
-                            setTimeout(mountYT, 100);
+                            setTimeout(bindYT, 150);
                         }
                     };
 
-                    mountYT();
+                    bindYT();
                 },
 
                 initDirectVideo(video) {
@@ -701,6 +709,31 @@
                 },
 
                 unmute() {
+                    if (this.videoSource === 'youtube') {
+                        const iframe = document.getElementById('ytPlayerFrame');
+                        if (iframe && iframe.contentWindow) {
+                            try {
+                                iframe.contentWindow.postMessage(JSON.stringify({
+                                    event: 'command',
+                                    func: 'unMute',
+                                    args: ''
+                                }), '*');
+                                iframe.contentWindow.postMessage(JSON.stringify({
+                                    event: 'command',
+                                    func: 'setVolume',
+                                    args: [100]
+                                }), '*');
+                            } catch (e) {}
+                        }
+                        if (this.ytPlayer && typeof this.ytPlayer.unMute === 'function') {
+                            try {
+                                this.ytPlayer.unMute();
+                                this.ytPlayer.setVolume(100);
+                            } catch (e) {}
+                        }
+                        this.isMuted = false;
+                        return;
+                    }
                     const video = this.$refs.videoPlayer || document.getElementById('mainVideo');
                     if (video) {
                         video.muted = false;
@@ -709,6 +742,25 @@
                 },
 
                 togglePlay() {
+                    if (this.videoSource === 'youtube') {
+                        if (this.ytPlayer && typeof this.ytPlayer.getPlayerState === 'function') {
+                            try {
+                                const state = this.ytPlayer.getPlayerState();
+                                if (state === YT.PlayerState.PLAYING) {
+                                    this.ytPlayer.pauseVideo();
+                                    this.isPlaying = false;
+                                } else {
+                                    if (this.isMuted && typeof this.ytPlayer.unMute === 'function') {
+                                        this.ytPlayer.unMute();
+                                        this.isMuted = false;
+                                    }
+                                    this.ytPlayer.playVideo();
+                                    this.isPlaying = true;
+                                }
+                            } catch (e) {}
+                        }
+                        return;
+                    }
                     const video = this.$refs.videoPlayer || document.getElementById('mainVideo');
                     if (!video) return;
                     if (video.paused) {

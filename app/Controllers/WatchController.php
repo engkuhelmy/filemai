@@ -47,20 +47,27 @@ class WatchController
             }
         }
 
-        // Attach HLS Adaptive Bitrate Stream URL if available
+        // Attach HLS Adaptive Bitrate Stream URL if available (only for direct videos)
         $hlsFile = dirname(__DIR__, 2) . '/uploads/videos/hls/ep.m3u8';
         $hasHls = file_exists($hlsFile);
-        $episode['hls_url'] = $hasHls ? '/uploads/videos/hls/ep.m3u8' : null;
+        $isDirect = ($episode['video_source'] ?? 'direct') === 'direct';
+        $episode['hls_url'] = ($isDirect && $hasHls) ? '/uploads/videos/hls/ep.m3u8' : null;
         if ($nextEpisode) {
-            $nextEpisode['hls_url'] = $hasHls ? '/uploads/videos/hls/ep.m3u8' : null;
+            $nextIsDirect = ($nextEpisode['video_source'] ?? 'direct') === 'direct';
+            $nextEpisode['hls_url'] = ($nextIsDirect && $hasHls) ? '/uploads/videos/hls/ep.m3u8' : null;
         }
         if ($prevEpisode) {
-            $prevEpisode['hls_url'] = $hasHls ? '/uploads/videos/hls/ep.m3u8' : null;
+            $prevIsDirect = ($prevEpisode['video_source'] ?? 'direct') === 'direct';
+            $prevEpisode['hls_url'] = ($prevIsDirect && $hasHls) ? '/uploads/videos/hls/ep.m3u8' : null;
         }
 
         // Attach video poster / thumbnail
-        $epThumb = dirname(__DIR__, 2) . '/uploads/posters/ep' . $episode['id'] . '_thumb.jpg';
-        $episode['poster_url'] = file_exists($epThumb) ? '/uploads/posters/ep' . $episode['id'] . '_thumb.jpg' : ($episode['drama_poster'] ?? '');
+        if (($episode['video_source'] ?? '') === 'youtube' && !empty($episode['youtube_video_id'])) {
+            $episode['poster_url'] = "https://img.youtube.com/vi/{$episode['youtube_video_id']}/hqdefault.jpg";
+        } else {
+            $epThumb = dirname(__DIR__, 2) . '/uploads/posters/ep' . $episode['id'] . '_thumb.jpg';
+            $episode['poster_url'] = file_exists($epThumb) ? '/uploads/posters/ep' . $episode['id'] . '_thumb.jpg' : ($episode['drama_poster'] ?? '');
+        }
 
         // Interstitial Ad Logic
         $isPremium = Auth::isPremium();
