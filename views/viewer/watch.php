@@ -139,6 +139,7 @@
                             src="<?= $ytSrc ?>"
                             title="<?= htmlspecialchars($episode['title']) ?>"
                             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+                            referrerpolicy="strict-origin-when-cross-origin"
                             allowfullscreen
                             loading="eager">
                     </iframe>
@@ -153,6 +154,8 @@
                    class="absolute inset-0 w-full h-full object-cover z-0 cursor-pointer"
                    playsinline
                    webkit-playsinline
+                   muted
+                   autoplay
                    preload="auto"
                    poster="<?= htmlspecialchars($episode['poster_url'] ?? $episode['drama_poster'] ?? '/uploads/posters/ep1_thumb.jpg') ?>"
                    x-ref="videoPlayer"
@@ -232,12 +235,12 @@
                 <span>Ketik untuk Bersuara</span>
             </button>
 
-            <!-- Center Big Play Indicator for Direct Video -->
+            <!-- Center Big Play Indicator (Shows when video is paused or waiting for play) -->
             <div class="relative z-10 flex-1 flex items-center justify-center cursor-pointer pointer-events-auto" 
-                 x-show="videoSource === 'direct' && !isPlaying" 
+                 x-show="!isPlaying" 
                  @click.stop="togglePlay"
                  x-transition>
-                <div class="w-16 h-16 rounded-full bg-black/70 backdrop-blur-md border border-white/20 flex items-center justify-center text-white shadow-2xl scale-110 hover:scale-125 transition-transform">
+                <div class="w-16 h-16 rounded-full bg-black/75 backdrop-blur-md border border-white/20 flex items-center justify-center text-white shadow-2xl scale-110 hover:scale-125 transition-transform">
                     <i data-lucide="play" class="w-8 h-8 fill-white ml-1"></i>
                 </div>
             </div>
@@ -625,16 +628,19 @@
                                 else if (s === 2) { this.isPlaying = false; }
                                 else if (s === 0) { this.isPlaying = false; this.onVideoEnded(); }
                             }
-                            if (data.event === 'onReady') { this.isPlaying = true; }
+                            if (data.event === 'onReady') { 
+                                this.isPlaying = true; 
+                                this._ytCmd('playVideo', '');
+                            }
                         } catch (_) {}
                     };
                     window.addEventListener('message', ytMsgHandler);
 
                     // ── Store direct iframe reference for postMessage commands ─────────
-                    // We do NOT call new YT.Player() because it replaces the existing
-                    // iframe element (even when passed as a DOM node), destroying the
-                    // autoplay=1&mute=1 state already set via the src URL.
                     this._ytIframe = document.getElementById('ytPlayerFrame');
+                    setTimeout(() => {
+                        this._ytCmd('playVideo', '');
+                    }, 500);
                 },
 
                 // Send postMessage command to YouTube iframe
@@ -676,7 +682,6 @@
                                 this.isPlaying = true;
                                 if (typeof lucide !== 'undefined') lucide.createIcons();
                             }).catch(() => {
-                                // If unmuted was requested and failed, ensure muted is set and retry
                                 video.muted = true;
                                 this.isMuted = true;
                                 video.play().then(() => {
@@ -732,24 +737,28 @@
                             video.src = this.videoUrl;
                         }
 
-                        // Immediate check: if video already has enough data, play immediately
-                        if (video.readyState >= 1) {
-                            attemptAutoplay();
-                        } else {
-                            video.addEventListener('loadedmetadata', () => {
-                                if (!this.isPlaying) attemptAutoplay();
-                            }, { once: true });
-                            video.addEventListener('canplay', () => {
-                                if (!this.isPlaying) attemptAutoplay();
-                            }, { once: true });
-                        }
+                        // Explicitly initiate network fetch immediately
+                        try {
+                            video.load();
+                        } catch (e) {}
 
-                        // Safety timer: attempt autoplay in case events were already consumed
+                        // Immediate autoplay attempt
+                        attemptAutoplay();
+
+                        // Listen to canplay/loadedmetadata
+                        video.addEventListener('loadedmetadata', () => {
+                            if (!this.isPlaying) attemptAutoplay();
+                        }, { once: true });
+                        video.addEventListener('canplay', () => {
+                            if (!this.isPlaying) attemptAutoplay();
+                        }, { once: true });
+
+                        // Safety timer in case events were already fired
                         setTimeout(() => {
                             if (!this.isPlaying && video.paused) {
                                 attemptAutoplay();
                             }
-                        }, 250);
+                        }, 350);
                     }
                 },
 
@@ -774,32 +783,31 @@
                             this._ytCmd('pauseVideo', '');
                             this.isPlaying = false;
                         } else {
-                            if (this.isMuted) {
-                                this._ytCmd('unMute', '');
-                                this._ytCmd('setVolume', [100]);
-                                this.isMuted = false;
-                            }
+                            this._ytCmd('unMute', '');
+                            this._ytCmd('setVolume', [100]);
                             this._ytCmd('playVideo', '');
                             this.isPlaying = true;
+                            this.isMuted = false;
                         }
                         return;
                     }
                     const video = this.$refs.videoPlayer || document.getElementById('mainVideo');
                     if (!video) return;
                     if (video.paused) {
-                        if (this.isMuted) {
-                            video.muted = false;
-                            this.isMuted = false;
-                        }
-                        video.play().then(() => {
-                            this.isPlaying = true;
-                        }).catch(() => {
-                            video.muted = true;
-                            this.isMuted = true;
-                            video.play().then(() => {
+                        video.muted = false;
+                        this.isMuted = false;
+                        const p = video.play();
+                        if (p !== undefined) {
+                            p.then(() => {
                                 this.isPlaying = true;
-                            }).catch(() => {});
-                        });
+                            }).catch(() => {
+                                video.muted = true;
+                                this.isMuted = true;
+                                video.play().then(() => {
+                                    this.isPlaying = true;
+                                }).catch(() => {});
+                            });
+                        }
                     } else {
                         video.pause();
                         this.isPlaying = false;
@@ -952,6 +960,12 @@
                         } else if (deltaY > 0 && this.prevEpisodeId) {
                             // Swiped Down -> Prev Episode
                             window.location.href = `/watch/${this.prevEpisodeId}`;
+                        }
+                    } else if (Math.abs(deltaY) < 15 && Math.abs(deltaX) < 15) {
+                        // Single tap on screen -> toggle play/pause
+                        const target = e.target;
+                        if (!target.closest('button, a, input, select, textarea, .pointer-events-auto')) {
+                            this.togglePlay();
                         }
                     }
                 }
