@@ -158,7 +158,10 @@
                    x-ref="videoPlayer"
                    @click="togglePlay"
                    @timeupdate="onTimeUpdate"
-                   @ended="onVideoEnded">
+                   @ended="onVideoEnded"
+                   <?php if (($episode['video_source'] ?? 'direct') === 'direct' && empty($episode['hls_url']) && !empty($episode['video_url'])): ?>
+                   src="<?= htmlspecialchars($episode['video_url']) ?>"
+                   <?php endif; ?>>
                 <?php if (($episode['video_source'] ?? 'direct') === 'direct'): ?>
                     <?php if (!empty($episode['hls_url'])): ?>
                         <source src="<?= htmlspecialchars($episode['hls_url']) ?>" type="application/x-mpegURL">
@@ -664,27 +667,29 @@
                     });
 
                     const attemptAutoplay = () => {
+                        // Start muted autoplay (guaranteed permission by mobile & desktop browsers)
+                        video.muted = true;
+                        this.isMuted = true;
                         const playPromise = video.play();
                         if (playPromise !== undefined) {
                             playPromise.then(() => {
                                 this.isPlaying = true;
-                                this.isMuted = video.muted;
+                                if (typeof lucide !== 'undefined') lucide.createIcons();
                             }).catch(() => {
-                                // Browser blocked unmuted autoplay: start muted so video plays immediately
+                                // If unmuted was requested and failed, ensure muted is set and retry
                                 video.muted = true;
                                 this.isMuted = true;
                                 video.play().then(() => {
                                     this.isPlaying = true;
                                     if (typeof lucide !== 'undefined') lucide.createIcons();
                                 }).catch(() => {
-                                    // If even muted autoplay fails, wait for user click/tap
                                     this.isPlaying = false;
                                 });
                             });
                         }
                     };
 
-                    // Check if HLS.js is supported (Chrome, Android, Firefox, Edge)
+                    // Check if HLS.js is supported (only if this episode actually has an HLS playlist)
                     if (this.hlsUrl && typeof Hls !== 'undefined' && Hls.isSupported()) {
                         const hls = new Hls({ 
                             autoStartLoad: true,
@@ -721,14 +726,30 @@
                         video.addEventListener('loadedmetadata', () => {
                             attemptAutoplay();
                         }, { once: true });
-                    } else if (this.videoUrl) {
-                        video.src = this.videoUrl;
-                        video.addEventListener('loadedmetadata', () => {
-                            attemptAutoplay();
-                        }, { once: true });
                     } else {
-                        // Media source already specified via <source> tags
-                        attemptAutoplay();
+                        // Direct MP4 Video Playback
+                        if (!video.src && this.videoUrl) {
+                            video.src = this.videoUrl;
+                        }
+
+                        // Immediate check: if video already has enough data, play immediately
+                        if (video.readyState >= 1) {
+                            attemptAutoplay();
+                        } else {
+                            video.addEventListener('loadedmetadata', () => {
+                                if (!this.isPlaying) attemptAutoplay();
+                            }, { once: true });
+                            video.addEventListener('canplay', () => {
+                                if (!this.isPlaying) attemptAutoplay();
+                            }, { once: true });
+                        }
+
+                        // Safety timer: attempt autoplay in case events were already consumed
+                        setTimeout(() => {
+                            if (!this.isPlaying && video.paused) {
+                                attemptAutoplay();
+                            }
+                        }, 250);
                     }
                 },
 
@@ -772,7 +793,13 @@
                         }
                         video.play().then(() => {
                             this.isPlaying = true;
-                        }).catch(() => {});
+                        }).catch(() => {
+                            video.muted = true;
+                            this.isMuted = true;
+                            video.play().then(() => {
+                                this.isPlaying = true;
+                            }).catch(() => {});
+                        });
                     } else {
                         video.pause();
                         this.isPlaying = false;

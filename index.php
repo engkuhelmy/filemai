@@ -9,8 +9,8 @@ if (php_sapi_name() === 'cli-server') {
     $uriPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
     $filePath = __DIR__ . $uriPath;
     if ($uriPath !== '/' && file_exists($filePath) && !is_dir($filePath)) {
-        // Handle MP4 video with full HTTP Byte-Range support (required by iOS Safari & smooth seeking)
-        if (str_ends_with($filePath, '.mp4')) {
+        // Handle video streaming with full HTTP Byte-Range support (required by iOS Safari, Chrome & smooth seeking)
+        if (preg_match('/\.(mp4|m4v|mov|webm)$/i', $filePath)) {
             $fileSize = filesize($filePath);
             $file = fopen($filePath, 'rb');
             if (!$file) {
@@ -18,10 +18,19 @@ if (php_sapi_name() === 'cli-server') {
                 exit;
             }
 
+            $ext = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
+            $mimeTypes = [
+                'mp4' => 'video/mp4',
+                'm4v' => 'video/mp4',
+                'mov' => 'video/quicktime',
+                'webm' => 'video/webm'
+            ];
+            $contentType = $mimeTypes[$ext] ?? 'video/mp4';
+
             $start = 0;
             $end = $fileSize - 1;
 
-            header('Content-Type: video/mp4');
+            header("Content-Type: $contentType");
             header('Accept-Ranges: bytes');
             header('Cache-Control: public, max-age=86400');
             header('Access-Control-Allow-Origin: *');
@@ -66,6 +75,22 @@ if (php_sapi_name() === 'cli-server') {
             }
 
             fclose($file);
+            exit;
+        }
+
+        // Handle HLS playlists and video segments with CORS support
+        if (str_ends_with($filePath, '.m3u8')) {
+            header('Content-Type: application/vnd.apple.mpegurl');
+            header('Access-Control-Allow-Origin: *');
+            header('Cache-Control: no-cache');
+            readfile($filePath);
+            exit;
+        }
+        if (str_ends_with($filePath, '.ts')) {
+            header('Content-Type: video/mp2t');
+            header('Access-Control-Allow-Origin: *');
+            header('Cache-Control: public, max-age=86400');
+            readfile($filePath);
             exit;
         }
 
