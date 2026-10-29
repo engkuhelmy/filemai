@@ -4,11 +4,71 @@
  * Dikuasakan oleh PHP 8.4, MariaDB & Nginx
  */
 
-// If running under PHP built-in CLI server, serve static files directly
+// If running under PHP built-in CLI server, serve static files directly or stream video with HTTP Range
 if (php_sapi_name() === 'cli-server') {
     $uriPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
     $filePath = __DIR__ . $uriPath;
     if ($uriPath !== '/' && file_exists($filePath) && !is_dir($filePath)) {
+        // Handle MP4 video with full HTTP Byte-Range support (required by iOS Safari & smooth seeking)
+        if (str_ends_with($filePath, '.mp4')) {
+            $fileSize = filesize($filePath);
+            $file = fopen($filePath, 'rb');
+            if (!$file) {
+                http_response_code(404);
+                exit;
+            }
+
+            $start = 0;
+            $end = $fileSize - 1;
+
+            header('Content-Type: video/mp4');
+            header('Accept-Ranges: bytes');
+            header('Cache-Control: public, max-age=86400');
+            header('Access-Control-Allow-Origin: *');
+            header('Access-Control-Allow-Headers: Range, Content-Type, Accept');
+            header('Access-Control-Expose-Headers: Content-Range, Content-Length, Accept-Ranges');
+
+            if (isset($_SERVER['HTTP_RANGE'])) {
+                $range = $_SERVER['HTTP_RANGE'];
+                if (preg_match('/bytes=(\d+)-(\d*)/', $range, $matches)) {
+                    $start = (int)$matches[1];
+                    if (!empty($matches[2])) {
+                        $end = (int)$matches[2];
+                    }
+                }
+
+                if ($start > $end || $start >= $fileSize) {
+                    http_response_code(416);
+                    header("Content-Range: bytes */$fileSize");
+                    fclose($file);
+                    exit;
+                }
+
+                http_response_code(206);
+                header("Content-Range: bytes $start-$end/$fileSize");
+                $length = $end - $start + 1;
+                header("Content-Length: $length");
+            } else {
+                header("Content-Length: $fileSize");
+            }
+
+            fseek($file, $start);
+            $bufferSize = 64 * 1024;
+            $bytesRemaining = $end - $start + 1;
+
+            while (!feof($file) && $bytesRemaining > 0 && !connection_aborted()) {
+                $bytesToRead = min($bufferSize, $bytesRemaining);
+                $data = fread($file, $bytesToRead);
+                if ($data === false) break;
+                echo $data;
+                flush();
+                $bytesRemaining -= strlen($data);
+            }
+
+            fclose($file);
+            exit;
+        }
+
         return false;
     }
 }
@@ -50,6 +110,7 @@ Auth::start();
 // -------------------------------------------------------------
 Router::get('/', [HomeController::class, 'index']);
 Router::get('/drama/{slug}', [DramaController::class, 'show']);
+Router::get('/drama/{slug}/episode/{number}', [WatchController::class, 'watchByDramaAndEpisode']);
 Router::get('/watch/{id}', [WatchController::class, 'watch']);
 Router::get('/subscribe', [SubscriptionController::class, 'index']);
 Router::get('/subscribe/checkout', [SubscriptionController::class, 'checkout']);

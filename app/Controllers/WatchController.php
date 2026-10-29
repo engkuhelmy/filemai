@@ -58,6 +58,10 @@ class WatchController
             $prevEpisode['hls_url'] = $hasHls ? '/uploads/videos/hls/ep.m3u8' : null;
         }
 
+        // Attach video poster / thumbnail
+        $epThumb = dirname(__DIR__, 2) . '/uploads/posters/ep' . $episode['id'] . '_thumb.jpg';
+        $episode['poster_url'] = file_exists($epThumb) ? '/uploads/posters/ep' . $episode['id'] . '_thumb.jpg' : ($episode['drama_poster'] ?? '');
+
         // Interstitial Ad Logic
         $isPremium = Auth::isPremium();
         $ad = null;
@@ -80,5 +84,21 @@ class WatchController
             'ad' => $ad,
             'noLayout' => true, // Vertical theater player uses its own tailored fullscreen layout
         ]);
+    }
+
+    public function watchByDramaAndEpisode(string $dramaSlug, string $episodeNumber): void
+    {
+        $ep = Database::fetchOne(
+            "SELECT e.id FROM episodes e JOIN dramas d ON e.drama_id = d.id WHERE d.slug = ? AND e.episode_number = ?",
+            [$dramaSlug, (int)$episodeNumber]
+        );
+
+        if (!$ep) {
+            http_response_code(404);
+            Router::render('errors/404', ['title' => 'Episod Tidak Ditemui']);
+            return;
+        }
+
+        $this->watch((string)$ep['id']);
     }
 }
