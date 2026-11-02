@@ -6,6 +6,7 @@ use App\Models\Drama;
 use App\Models\Episode;
 use App\Http\Controllers\EpisodeWatchController;
 use App\Http\Controllers\Creator\EpisodeController as CreatorEpisodeController;
+use App\Http\Controllers\Auth\AuthController;
 
 /*
 |--------------------------------------------------------------------------
@@ -128,3 +129,32 @@ Route::middleware(['auth'])->prefix('creator')->name('creator.')->group(function
     Route::delete('/dramas/{drama}/episodes/{episode}', [CreatorEpisodeController::class, 'destroy'])
         ->name('dramas.episodes.destroy');
 });
+
+/*
+|--------------------------------------------------------------------------
+| Authentication Routes (Real Register, Login & Logout)
+|--------------------------------------------------------------------------
+*/
+Route::middleware('guest')->group(function () {
+    Route::get('/login', [AuthController::class, 'showLoginForm'])->name('login');
+    Route::post('/login', [AuthController::class, 'login']);
+
+    Route::get('/register', [AuthController::class, 'showRegisterForm'])->name('register');
+    Route::post('/register', [AuthController::class, 'register']);
+});
+
+Route::middleware('auth')->group(function () {
+    Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+    Route::get('/logout', [AuthController::class, 'logout']); // Fallback GET
+});
+
+// Quick 1-click Demo Account Switcher (Staging/Dev)
+Route::get('/demo/switch/{id}', [AuthController::class, 'demoSwitch'])->name('demo.switch');
+
+// VIP Subscription Info Page
+Route::get('/subscribe', function () {
+    return view('subscribe', [
+        'title' => 'Langgan Pas VIP Filemai - RM5 / Bulan',
+    ]);
+})->name('subscribe');
+
