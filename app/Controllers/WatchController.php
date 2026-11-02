@@ -47,15 +47,33 @@ class WatchController
             }
         }
 
-        // Attach HLS Adaptive Bitrate Stream URL if available
-        $hlsFile = dirname(__DIR__, 2) . '/uploads/videos/hls/ep.m3u8';
-        $hasHls = file_exists($hlsFile);
-        $episode['hls_url'] = $hasHls ? '/uploads/videos/hls/ep.m3u8' : null;
+        // Attach HLS stream ONLY if the episode specifically uses an .m3u8 URL or has an episode-specific HLS file
+        $isDirect = ($episode['video_source'] ?? 'direct') === 'direct';
+        $episode['hls_url'] = null;
+        if ($isDirect && !empty($episode['video_url']) && str_ends_with(strtolower($episode['video_url']), '.m3u8')) {
+            $episode['hls_url'] = $episode['video_url'];
+        } else if ($isDirect) {
+            $epHlsFile = dirname(__DIR__, 2) . '/uploads/videos/hls/ep' . $episode['id'] . '.m3u8';
+            if (file_exists($epHlsFile)) {
+                $episode['hls_url'] = '/uploads/videos/hls/ep' . $episode['id'] . '.m3u8';
+            }
+        }
+
         if ($nextEpisode) {
-            $nextEpisode['hls_url'] = $hasHls ? '/uploads/videos/hls/ep.m3u8' : null;
+            $nextIsDirect = ($nextEpisode['video_source'] ?? 'direct') === 'direct';
+            $nextEpisode['hls_url'] = ($nextIsDirect && !empty($nextEpisode['video_url']) && str_ends_with(strtolower($nextEpisode['video_url']), '.m3u8')) ? $nextEpisode['video_url'] : null;
         }
         if ($prevEpisode) {
-            $prevEpisode['hls_url'] = $hasHls ? '/uploads/videos/hls/ep.m3u8' : null;
+            $prevIsDirect = ($prevEpisode['video_source'] ?? 'direct') === 'direct';
+            $prevEpisode['hls_url'] = ($prevIsDirect && !empty($prevEpisode['video_url']) && str_ends_with(strtolower($prevEpisode['video_url']), '.m3u8')) ? $prevEpisode['video_url'] : null;
+        }
+
+        // Attach video poster / thumbnail
+        if (($episode['video_source'] ?? '') === 'youtube' && !empty($episode['youtube_video_id'])) {
+            $episode['poster_url'] = "https://img.youtube.com/vi/{$episode['youtube_video_id']}/hqdefault.jpg";
+        } else {
+            $epThumb = dirname(__DIR__, 2) . '/uploads/posters/ep' . $episode['id'] . '_thumb.jpg';
+            $episode['poster_url'] = file_exists($epThumb) ? '/uploads/posters/ep' . $episode['id'] . '_thumb.jpg' : ($episode['drama_poster'] ?? '');
         }
 
         // Interstitial Ad Logic
@@ -80,5 +98,21 @@ class WatchController
             'ad' => $ad,
             'noLayout' => true, // Vertical theater player uses its own tailored fullscreen layout
         ]);
+    }
+
+    public function watchByDramaAndEpisode(string $dramaSlug, string $episodeNumber): void
+    {
+        $ep = Database::fetchOne(
+            "SELECT e.id FROM episodes e JOIN dramas d ON e.drama_id = d.id WHERE d.slug = ? AND e.episode_number = ?",
+            [$dramaSlug, (int)$episodeNumber]
+        );
+
+        if (!$ep) {
+            http_response_code(404);
+            Router::render('errors/404', ['title' => 'Episod Tidak Ditemui']);
+            return;
+        }
+
+        $this->watch((string)$ep['id']);
     }
 }

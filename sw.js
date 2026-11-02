@@ -35,8 +35,12 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
     const url = new URL(event.request.url);
 
-    // Bypass caching for streaming video files and API mutating endpoints
-    if (url.pathname.endsWith('.mp4') || url.pathname.endsWith('.ts') || url.pathname.startsWith('/api/')) {
+    // Bypass caching for streaming video files, HLS chunks & playlists, and API endpoints
+    if (url.pathname.endsWith('.mp4') || 
+        url.pathname.endsWith('.ts') || 
+        url.pathname.endsWith('.m3u8') || 
+        url.pathname.startsWith('/uploads/videos/') || 
+        url.pathname.startsWith('/api/')) {
         return;
     }
 
@@ -65,3 +69,4 @@ self.addEventListener('fetch', (event) => {
         })
     );
 });
+

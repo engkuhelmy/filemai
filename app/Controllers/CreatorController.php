@@ -5,6 +5,7 @@ namespace App\Controllers;
 use App\Database;
 use App\Auth;
 use App\Router;
+use App\Services\YouTubeService;
 
 class CreatorController
 {
@@ -134,31 +135,74 @@ class CreatorController
 
         $epNumber = (int)($_POST['episode_number'] ?? 1);
         $title = trim($_POST['title'] ?? "Episod $epNumber");
-        $duration = (int)($_POST['duration'] ?? 60);
+        $duration = !empty($_POST['duration']) ? (int)$_POST['duration'] : null;
         $isFree = isset($_POST['is_free_preview']) ? 1 : 0;
+        $videoSource = in_array($_POST['video_source'] ?? '', ['youtube', 'direct']) ? $_POST['video_source'] : 'youtube';
 
-        // Video upload or external URL
-        $videoUrl = '/uploads/videos/sample_reel.mp4';
-        if (isset($_FILES['video_file']) && $_FILES['video_file']['error'] === UPLOAD_ERR_OK) {
-            $ext = strtolower(pathinfo($_FILES['video_file']['name'], PATHINFO_EXTENSION));
-            if (in_array($ext, ['mp4', 'webm', 'mov', 'm4v'])) {
-                $filename = 'ep_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
-                $dest = __DIR__ . '/../../uploads/videos/' . $filename;
-                if (move_uploaded_file($_FILES['video_file']['tmp_name'], $dest)) {
-                    $videoUrl = '/uploads/videos/' . $filename;
-                }
+        // 1. Prevent duplicate episode_number within the same drama
+        $duplicate = Database::fetchOne(
+            "SELECT id FROM episodes WHERE drama_id = ? AND episode_number = ?",
+            [$drama['id'], $epNumber]
+        );
+        if ($duplicate) {
+            $_SESSION['error'] = "Episod nombor {$epNumber} sudah wujud untuk drama ini! Sila pilih nombor episod yang belum digunakan.";
+            Router::redirect('/creator/drama/' . $drama['id']);
+            return;
+        }
+
+        $youtubeVideoId = null;
+        $videoUrl = null;
+
+        // 2. Validate and process video source
+        if ($videoSource === 'youtube') {
+            $youtubeUrl = trim($_POST['youtube_url'] ?? '');
+            if (empty($youtubeUrl)) {
+                $_SESSION['error'] = 'Sila masukkan pautan video YouTube atau YouTube Shorts.';
+                Router::redirect('/creator/drama/' . $drama['id']);
+                return;
             }
-        } elseif (!empty($_POST['video_url'])) {
-            $videoUrl = trim($_POST['video_url']);
+
+            $youtubeVideoId = YouTubeService::extractVideoId($youtubeUrl);
+            if (!$youtubeVideoId || !YouTubeService::isValidId($youtubeVideoId)) {
+                $_SESSION['error'] = 'Pautan YouTube tidak sah. Sila pastikan format URL YouTube atau Shorts mengandungi 11-aksara ID video yang tepat.';
+                Router::redirect('/creator/drama/' . $drama['id']);
+                return;
+            }
+
+            $videoUrl = $youtubeUrl;
+            if ($duration === null) {
+                $duration = 60; // default vertical mini-drama duration
+            }
+        } else {
+            // Direct video upload or external direct CDN URL
+            if (isset($_FILES['video_file']) && $_FILES['video_file']['error'] === UPLOAD_ERR_OK) {
+                $ext = strtolower(pathinfo($_FILES['video_file']['name'], PATHINFO_EXTENSION));
+                if (in_array($ext, ['mp4', 'webm', 'mov', 'm4v'])) {
+                    $filename = 'ep_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
+                    $dest = __DIR__ . '/../../uploads/videos/' . $filename;
+                    if (move_uploaded_file($_FILES['video_file']['tmp_name'], $dest)) {
+                        $videoUrl = '/uploads/videos/' . $filename;
+                    }
+                }
+            } elseif (!empty($_POST['video_url'])) {
+                $videoUrl = trim($_POST['video_url']);
+            }
+
+            if (empty($videoUrl)) {
+                $videoUrl = '/uploads/videos/sample_reel.mp4';
+            }
+            if ($duration === null) {
+                $duration = 60;
+            }
         }
 
         Database::insertGetId(
-            "INSERT INTO episodes (drama_id, episode_number, title, video_url, duration, is_free_preview)
-             VALUES (?, ?, ?, ?, ?, ?)",
-            [$drama['id'], $epNumber, $title, $videoUrl, $duration, $isFree]
+            "INSERT INTO episodes (drama_id, episode_number, title, video_source, youtube_video_id, video_url, duration, is_free_preview)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            [$drama['id'], $epNumber, $title, $videoSource, $youtubeVideoId, $videoUrl, $duration, $isFree]
         );
 
-        $_SESSION['success'] = "Episod $epNumber berjaya dimuat naik!";
+        $_SESSION['success'] = "Episod {$epNumber} (\"{$title}\") berjaya disimpan!";
         Router::redirect('/creator/drama/' . $drama['id']);
     }
 
