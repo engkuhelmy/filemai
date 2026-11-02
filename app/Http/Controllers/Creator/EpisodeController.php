@@ -28,22 +28,54 @@ class EpisodeController extends Controller
     }
 
     /**
-     * Store newly created YouTube episode for the drama.
+     * Store newly created episode for the drama (direct storage MP4 or YouTube).
      */
     public function store(StoreEpisodeRequest $request, Drama $drama): RedirectResponse
     {
         $validated = $request->validated();
+        $videoType = $validated['video_type'] ?? 'storage';
 
-        // Extract 11-char YouTube Video ID
-        $videoId = YouTubeService::extractVideoId($validated['youtube_url']);
+        $youtubeVideoId = null;
+        $videoUrl = null;
+
+        if ($videoType === 'youtube') {
+            $rawUrl = $validated['youtube_url'] ?? '';
+            $youtubeVideoId = \App\Helpers\MediaHelper::extractYouTubeId($rawUrl);
+            $videoUrl = \App\Helpers\MediaHelper::cleanYouTubeUrl($rawUrl) ?? $rawUrl;
+            $videoSource = 'youtube';
+        } else {
+            // Storage file upload or CDN URL
+            if ($request->hasFile('video_file') && $request->file('video_file')->isValid()) {
+                $file = $request->file('video_file');
+                $ext = strtolower($file->getClientOriginalExtension());
+                $filename = 'ep_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
+                
+                // Destination in public uploads directory
+                $targetDir = public_path('uploads/videos');
+                if (!file_exists($targetDir)) {
+                    @mkdir($targetDir, 0755, true);
+                }
+                
+                $file->move($targetDir, $filename);
+                $videoUrl = '/uploads/videos/' . $filename;
+            } elseif (!empty($validated['video_url'])) {
+                $videoUrl = trim($validated['video_url']);
+            } else {
+                $videoUrl = '/uploads/videos/sample_reel.mp4';
+            }
+
+            $videoSource = 'direct';
+            $youtubeVideoId = null;
+        }
 
         // Create episode record
         $episode = $drama->episodes()->create([
             'episode_number' => $validated['episode_number'],
             'title' => $validated['title'],
-            'video_source' => 'youtube',
-            'youtube_video_id' => $videoId,
-            'video_url' => $validated['youtube_url'],
+            'video_type' => $videoType,
+            'video_source' => $videoSource,
+            'youtube_video_id' => $youtubeVideoId,
+            'video_url' => $videoUrl,
             'duration' => $validated['duration'] ?? 60,
             'is_free_preview' => $request->boolean('is_free_preview', false),
         ]);

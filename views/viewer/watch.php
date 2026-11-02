@@ -124,24 +124,24 @@
              @touchstart="onTouchStart($event)"
              @touchend="onTouchEnd($event)">
             
-            <!-- Source 1: YouTube IFrame Embed (pure iframe, no YT.Player API replacement) -->
+            <?php 
+                $isYt = (($episode['video_type'] ?? '') === 'youtube' || ($episode['video_source'] ?? '') === 'youtube');
+                $ytId = htmlspecialchars($episode['youtube_video_id'] ?? '');
+            ?>
+
+            <!-- Source 1: YouTube IFrame Embed (Resilient Pre-rendered Iframe + YT.Player API) -->
             <div x-show="videoSource === 'youtube'" 
-                 class="absolute inset-0 w-full h-full z-0 yt-iframe-container bg-black flex items-center justify-center overflow-hidden"
+                 class="absolute inset-0 w-full h-full z-10 yt-iframe-container bg-black overflow-hidden flex items-center justify-center pointer-events-auto"
+                 <?= !$isYt ? 'style="display: none;"' : '' ?>
                  id="ytContainer">
-                <?php if (($episode['video_source'] ?? '') === 'youtube' && !empty($episode['youtube_video_id'])): ?>
-                    <?php
-                        $ytId = htmlspecialchars($episode['youtube_video_id']);
-                        // Clean standard YouTube embed URL - works for regular videos & Shorts, avoids Error 150/152
-                        $ytSrc = "https://www.youtube.com/embed/{$ytId}?autoplay=1&mute=1&playsinline=1&controls=1&rel=0&modestbranding=1&enablejsapi=1";
-                    ?>
+                <?php if (!empty($ytId)): ?>
                     <iframe id="ytPlayerFrame" 
                             class="w-full h-full border-0 absolute inset-0"
-                            src="<?= $ytSrc ?>"
+                            src="https://www.youtube-nocookie.com/embed/<?= $ytId ?>?enablejsapi=1&autoplay=1&mute=1&playsinline=1&controls=1&rel=0&modestbranding=1"
                             title="<?= htmlspecialchars($episode['title']) ?>"
                             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
                             referrerpolicy="strict-origin-when-cross-origin"
-                            allowfullscreen
-                            loading="eager">
+                            allowfullscreen>
                     </iframe>
                 <?php else: ?>
                     <div id="ytPlayerFrame" class="w-full h-full bg-black"></div>
@@ -150,6 +150,7 @@
 
             <!-- Source 2: Direct MP4 / Adaptive HLS Video Element -->
             <video x-show="videoSource === 'direct'"
+                   <?= $isYt ? 'style="display: none;"' : '' ?>
                    id="mainVideo" 
                    class="absolute inset-0 w-full h-full object-cover z-0 cursor-pointer"
                    playsinline
@@ -162,10 +163,10 @@
                    @click="togglePlay"
                    @timeupdate="onTimeUpdate"
                    @ended="onVideoEnded"
-                   <?php if (($episode['video_source'] ?? 'direct') === 'direct' && empty($episode['hls_url']) && !empty($episode['video_url'])): ?>
+                   <?php if (!$isYt && empty($episode['hls_url']) && !empty($episode['video_url'])): ?>
                    src="<?= htmlspecialchars($episode['video_url']) ?>"
                    <?php endif; ?>>
-                <?php if (($episode['video_source'] ?? 'direct') === 'direct'): ?>
+                <?php if (!$isYt): ?>
                     <?php if (!empty($episode['hls_url'])): ?>
                         <source src="<?= htmlspecialchars($episode['hls_url']) ?>" type="application/x-mpegURL">
                     <?php endif; ?>
@@ -235,9 +236,9 @@
                 <span>Ketik untuk Bersuara</span>
             </button>
 
-            <!-- Center Big Play Indicator (Shows when video is paused or waiting for play) -->
+            <!-- Center Big Play Indicator (Shows when direct video is paused) -->
             <div class="relative z-10 flex-1 flex items-center justify-center cursor-pointer pointer-events-auto" 
-                 x-show="!isPlaying" 
+                 x-show="!isPlaying && videoSource === 'direct'" 
                  @click.stop="togglePlay"
                  x-transition>
                 <div class="w-16 h-16 rounded-full bg-black/75 backdrop-blur-md border border-white/20 flex items-center justify-center text-white shadow-2xl scale-110 hover:scale-125 transition-transform">
@@ -613,49 +614,50 @@
                 initYouTube() {
                     if (!this.youtubeVideoId) return;
 
-                    this.isMuted = true;
-                    this.isPlaying = true; // iframe autoplays via mute=1&autoplay=1 in src
-
-                    // ── postMessage state tracking (works without YT.Player API) ──────
-                    const ytMsgHandler = (e) => {
+                    // 1. Immediate postMessage listener (catches events even before API initializes)
+                    window.addEventListener('message', (e) => {
                         try {
                             const data = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
-                            if (!data) return;
-                            // onStateChange: 0=ENDED 1=PLAYING 2=PAUSED
-                            if (data.event === 'onStateChange') {
-                                const s = data.info;
-                                if (s === 1) { this.isPlaying = true; }
-                                else if (s === 2) { this.isPlaying = false; }
-                                else if (s === 0) { this.isPlaying = false; this.onVideoEnded(); }
-                            }
-                            if (data.event === 'onReady') { 
-                                this.isPlaying = true; 
-                                this._ytCmd('playVideo', '');
+                            if (data && data.event === 'onStateChange') {
+                                if (data.info === 1) { this.isPlaying = true; }
+                                else if (data.info === 2) { this.isPlaying = false; }
+                                else if (data.info === 0) { this.isPlaying = false; this.onVideoEnded(); }
                             }
                         } catch (_) {}
+                    });
+
+                    // 2. Bind official YT.Player API to existing iframe for full programmatics
+                    const mountYT = () => {
+                        if (window.YT && window.YT.Player) {
+                            try {
+                                this.ytPlayer = new YT.Player('ytPlayerFrame', {
+                                    events: {
+                                        'onReady': (event) => {
+                                            this.isMuted = true;
+                                            try { event.target.playVideo(); } catch (_) {}
+                                            this.isPlaying = true;
+                                        },
+                                        'onStateChange': (event) => {
+                                            if (event.data === YT.PlayerState.PLAYING) {
+                                                this.isPlaying = true;
+                                            } else if (event.data === YT.PlayerState.PAUSED) {
+                                                this.isPlaying = false;
+                                            } else if (event.data === YT.PlayerState.ENDED) {
+                                                this.isPlaying = false;
+                                                this.onVideoEnded();
+                                            }
+                                        }
+                                    }
+                                });
+                            } catch (e) {
+                                console.warn('YT player bind notice:', e);
+                            }
+                        } else {
+                            setTimeout(mountYT, 100);
+                        }
                     };
-                    window.addEventListener('message', ytMsgHandler);
 
-                    // ── Store direct iframe reference for postMessage commands ─────────
-                    this._ytIframe = document.getElementById('ytPlayerFrame');
-                    setTimeout(() => {
-                        this._ytCmd('playVideo', '');
-                    }, 500);
-                },
-
-                // Send postMessage command to YouTube iframe
-                _ytCmd(func, args) {
-                    const f = this._ytIframe || document.getElementById('ytPlayerFrame');
-                    if (f && f.contentWindow) {
-                        try {
-                            const payload = JSON.stringify({
-                                event: 'command',
-                                func: func,
-                                args: args !== undefined ? args : ''
-                            });
-                            f.contentWindow.postMessage(payload, '*');
-                        } catch (_) {}
-                    }
+                    mountYT();
                 },
 
                 initDirectVideo(video) {
@@ -764,9 +766,21 @@
 
                 unmute() {
                     if (this.videoSource === 'youtube') {
-                        this._ytCmd('unMute', '');
-                        this._ytCmd('setVolume', [100]);
-                        this._ytCmd('playVideo', '');
+                        if (this.ytPlayer && typeof this.ytPlayer.unMute === 'function') {
+                            try {
+                                this.ytPlayer.unMute();
+                                this.ytPlayer.setVolume(100);
+                                this.ytPlayer.playVideo();
+                            } catch (_) {}
+                        }
+                        const f = document.getElementById('ytPlayerFrame');
+                        if (f && f.contentWindow) {
+                            try {
+                                f.contentWindow.postMessage(JSON.stringify({event: 'command', func: 'unMute', args: ''}), '*');
+                                f.contentWindow.postMessage(JSON.stringify({event: 'command', func: 'setVolume', args: [100]}), '*');
+                                f.contentWindow.postMessage(JSON.stringify({event: 'command', func: 'playVideo', args: ''}), '*');
+                            } catch (_) {}
+                        }
                         this.isMuted = false;
                         return;
                     }
@@ -779,15 +793,23 @@
 
                 togglePlay() {
                     if (this.videoSource === 'youtube') {
+                        const f = document.getElementById('ytPlayerFrame');
                         if (this.isPlaying) {
-                            this._ytCmd('pauseVideo', '');
+                            if (this.ytPlayer && typeof this.ytPlayer.pauseVideo === 'function') {
+                                try { this.ytPlayer.pauseVideo(); } catch (_) {}
+                            }
+                            if (f && f.contentWindow) {
+                                try { f.contentWindow.postMessage(JSON.stringify({event: 'command', func: 'pauseVideo', args: ''}), '*'); } catch (_) {}
+                            }
                             this.isPlaying = false;
                         } else {
-                            this._ytCmd('unMute', '');
-                            this._ytCmd('setVolume', [100]);
-                            this._ytCmd('playVideo', '');
+                            if (this.ytPlayer && typeof this.ytPlayer.playVideo === 'function') {
+                                try { this.ytPlayer.playVideo(); } catch (_) {}
+                            }
+                            if (f && f.contentWindow) {
+                                try { f.contentWindow.postMessage(JSON.stringify({event: 'command', func: 'playVideo', args: ''}), '*'); } catch (_) {}
+                            }
                             this.isPlaying = true;
-                            this.isMuted = false;
                         }
                         return;
                     }
@@ -903,7 +925,13 @@
 
                     // Pause YouTube or Direct video if still playing
                     if (this.videoSource === 'youtube') {
-                        this._ytCmd('pauseVideo');
+                        if (this.ytPlayer && typeof this.ytPlayer.pauseVideo === 'function') {
+                            try { this.ytPlayer.pauseVideo(); } catch (_) {}
+                        }
+                        const f = document.getElementById('ytPlayerFrame');
+                        if (f && f.contentWindow) {
+                            try { f.contentWindow.postMessage(JSON.stringify({event: 'command', func: 'pauseVideo', args: ''}), '*'); } catch (_) {}
+                        }
                     }
                     const video = this.$refs.videoPlayer || document.getElementById('mainVideo');
                     if (video) {

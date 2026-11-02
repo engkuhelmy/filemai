@@ -196,10 +196,12 @@ class CreatorController
             }
         }
 
+        $videoType = ($videoSource === 'youtube') ? 'youtube' : 'storage';
+
         Database::insertGetId(
-            "INSERT INTO episodes (drama_id, episode_number, title, video_source, youtube_video_id, video_url, duration, is_free_preview)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            [$drama['id'], $epNumber, $title, $videoSource, $youtubeVideoId, $videoUrl, $duration, $isFree]
+            "INSERT INTO episodes (drama_id, episode_number, title, video_type, video_source, youtube_video_id, video_url, duration, is_free_preview)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            [$drama['id'], $epNumber, $title, $videoType, $videoSource, $youtubeVideoId, $videoUrl, $duration, $isFree]
         );
 
         $_SESSION['success'] = "Episod {$epNumber} (\"{$title}\") berjaya disimpan!";

@@ -1,6 +1,9 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Illuminate\Http\Request;
+use App\Models\Drama;
+use App\Models\Episode;
 use App\Http\Controllers\EpisodeWatchController;
 use App\Http\Controllers\Creator\EpisodeController as CreatorEpisodeController;
 
@@ -10,16 +13,100 @@ use App\Http\Controllers\Creator\EpisodeController as CreatorEpisodeController;
 |--------------------------------------------------------------------------
 */
 
-Route::get('/', function () {
-    return view('welcome');
+Route::get('/', function (Request $request) {
+    $search = trim($request->input('q', ''));
+    $selectedGenre = trim($request->input('genre', 'Semua'));
+    $activeTab = trim($request->input('tab', 'trends'));
+
+    $query = Drama::where('status', 'published')
+        ->with('creator')
+        ->withCount('episodes');
+
+    if (!empty($search)) {
+        $query->where(function ($q) use ($search) {
+            $q->where('title', 'LIKE', "%{$search}%")
+              ->orWhere('synopsis', 'LIKE', "%{$search}%");
+        });
+    }
+
+    if (!empty($selectedGenre) && $selectedGenre !== 'Semua') {
+        $query->where('genre', $selectedGenre);
+    }
+
+    $dramas = $query->orderBy('views_count', 'desc')->get();
+
+    // Map helper attributes for views
+    $dramas->each(function ($d) {
+        $d->first_episode_id = $d->episodes()->orderBy('episode_number', 'asc')->value('id') ?? 1;
+        $d->rating = ($d->genre === 'Action') ? '8.9' : '8.5';
+        $d->hook = ($d->genre === 'Action') ? '🔥 #1 Paling Trending di Malaysia' : '💖 Pilihan Penonton';
+        if (empty($d->banner_url)) {
+            $d->banner_url = '/uploads/posters/ceo-billboard.jpg';
+        }
+        $d->trailer_url = '/uploads/videos/sample_reel.mp4';
+    });
+
+    // Hero carousel dramas
+    $heroDramas = $dramas->take(3)->values();
+    if ($heroDramas->isEmpty()) {
+        $heroDramas = collect([
+            (object) [
+                'id' => 2,
+                'title' => 'Dendam Pewaris Yang Dibuang',
+                'slug' => 'dendam-pewaris-yang-dibuang',
+                'synopsis' => 'Dibuang oleh keluarga konglomeratnya 10 tahun lalu dan dihina sebagai pengemis jalanan. Kini, sang naga tidur bangkit kembali sebagai penguasa kewangan global terkuat untuk menuntut setiap titis air mata dan maruah yang telah dirampas!',
+                'poster_url' => '/uploads/posters/dendam-pewaris.jpg',
+                'banner_url' => '/uploads/posters/dendam-billboard.jpg',
+                'trailer_url' => '/uploads/videos/sample_reel.mp4',
+                'genre' => 'Action',
+                'episodes_count' => 3,
+                'first_episode_id' => 5,
+                'views_count' => 28922,
+                'rating' => '8.9',
+                'hook' => '🔥 #1 Paling Trending di Malaysia',
+            ],
+            (object) [
+                'id' => 1,
+                'title' => 'Jodoh Kontrak CEO Dingin',
+                'slug' => 'jodoh-kontrak-ceo-dingin',
+                'synopsis' => 'Seorang gadis biasa terpaksa menandatangani kontrak perkahwinan palsu bernilai RM1 Juta dengan CEO paling dingin di kota demi menyelamatkan perniagaan keluarganya.',
+                'poster_url' => '/uploads/posters/jodoh-kontrak-ceo.jpg',
+                'banner_url' => '/uploads/posters/ceo-billboard.jpg',
+                'trailer_url' => '/uploads/videos/sample_reel.mp4',
+                'genre' => 'Romance',
+                'episodes_count' => 4,
+                'first_episode_id' => 1,
+                'views_count' => 15459,
+                'rating' => '8.5',
+                'hook' => '💖 Top 10 Pilihan Peminat Romance',
+            ]
+        ]);
+    }
+
+    $trendsNow = $dramas;
+    $popular = $dramas->sortByDesc('views_count')->values();
+    $premieres = $dramas->sortByDesc('id')->values();
+    $genres = ['Semua', 'Action', 'Romance', 'Thriller', 'Revenge', 'CEO', 'Drama'];
+
+    return view('welcome', compact('dramas', 'heroDramas', 'trendsNow', 'popular', 'premieres', 'genres', 'selectedGenre', 'activeTab', 'search'));
 })->name('home');
+
+// Drama Landing Redirect to Episode 1
+Route::get('/drama/{drama:slug}', function (Drama $drama) {
+    $firstEpisode = $drama->episodes()->orderBy('episode_number', 'asc')->first();
+    $epNum = $firstEpisode ? $firstEpisode->episode_number : 1;
+    return redirect()->route('episodes.show', [
+        'drama' => $drama->slug,
+        'episode' => $epNum,
+    ]);
+})->name('drama.show');
 
 // Viewer Watch Route (Ad-Gated 9:16 Vertical Player)
 Route::get('/drama/{drama:slug}/episode/{episode:episode_number}', [EpisodeWatchController::class, 'show'])
     ->name('episodes.show');
 
 // Alternate direct episode route
-Route::get('/watch/{episode}', function (\App\Models\Episode $episode) {
+Route::get('/watch/{episode}', function (Episode $episode) {
     return redirect()->route('episodes.show', [
         'drama' => $episode->drama->slug,
         'episode' => $episode->episode_number,

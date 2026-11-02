@@ -17,6 +17,7 @@ class Episode extends Model
         'drama_id',
         'episode_number',
         'title',
+        'video_type',
         'video_source',
         'youtube_video_id',
         'video_url',
@@ -41,11 +42,47 @@ class Episode extends Model
     }
 
     /**
+     * Accessor for normalized video_type ('youtube' or 'storage').
+     */
+    public function getVideoTypeAttribute($value): string
+    {
+        if (!empty($value)) {
+            return $value;
+        }
+        if (!empty($this->video_source)) {
+            return $this->video_source === 'youtube' ? 'youtube' : 'storage';
+        }
+        if (!empty($this->youtube_video_id)) {
+            return 'youtube';
+        }
+        return \App\Helpers\MediaHelper::detectSource($this->video_url);
+    }
+
+    /**
      * Check if this episode is sourced from YouTube.
      */
     public function isYouTube(): bool
     {
-        return $this->video_source === 'youtube' && !empty($this->youtube_video_id);
+        return $this->video_type === 'youtube' || (!empty($this->video_source) && $this->video_source === 'youtube') || !empty($this->effective_youtube_id);
+    }
+
+    /**
+     * Get effective 11-char YouTube ID.
+     */
+    public function getEffectiveYoutubeIdAttribute(): ?string
+    {
+        if (!empty($this->youtube_video_id)) {
+            return $this->youtube_video_id;
+        }
+        return \App\Helpers\MediaHelper::extractYouTubeId($this->video_url);
+    }
+
+    /**
+     * Check if this episode is sourced from direct storage (MP4/WebM).
+     */
+    public function isStorage(): bool
+    {
+        return !$this->isYouTube();
     }
 
     /**
@@ -53,8 +90,8 @@ class Episode extends Model
      */
     public function getThumbnailUrlAttribute(): string
     {
-        if ($this->isYouTube()) {
-            return YouTubeService::getThumbnailUrl($this->youtube_video_id);
+        if ($this->isYouTube() && !empty($this->youtube_video_id)) {
+            return \App\Helpers\MediaHelper::getYouTubeThumbnail($this->youtube_video_id);
         }
         return $this->drama->poster_url ?? '/uploads/posters/default.jpg';
     }
