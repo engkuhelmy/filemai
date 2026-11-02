@@ -6,6 +6,7 @@ use App\Models\Drama;
 use App\Models\Episode;
 use App\Http\Controllers\EpisodeWatchController;
 use App\Http\Controllers\Creator\EpisodeController as CreatorEpisodeController;
+use App\Http\Controllers\Creator\DramaController as CreatorDramaController;
 use App\Http\Controllers\Auth\AuthController;
 
 /*
@@ -117,11 +118,24 @@ Route::get('/watch/{episode}', function (Episode $episode) {
 // Creator Studio Episode Management (Protected by auth & creator middleware)
 Route::middleware(['auth'])->prefix('creator')->name('creator.')->group(function () {
     
-    // Form to create YouTube episode
+    // Creator Studio Dashboard
+    Route::get('/', [CreatorDramaController::class, 'dashboard'])
+        ->name('dashboard');
+
+    // Manage Drama & Episodes List (creator.dramas.manage)
+    Route::get('/dramas/{drama}', [CreatorDramaController::class, 'manage'])
+        ->name('dramas.manage');
+
+    // Friendly alias for singular drama URL
+    Route::get('/drama/{drama}', function (Drama $drama) {
+        return redirect()->route('creator.dramas.manage', $drama);
+    });
+
+    // Form to create YouTube / Storage episode
     Route::get('/dramas/{drama}/episodes/create', [CreatorEpisodeController::class, 'create'])
         ->name('dramas.episodes.create');
 
-    // Store YouTube episode
+    // Store episode
     Route::post('/dramas/{drama}/episodes', [CreatorEpisodeController::class, 'store'])
         ->name('dramas.episodes.store');
 

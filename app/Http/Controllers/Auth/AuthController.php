@@ -161,3 +161,4 @@ class AuthController extends Controller
             ->with('success', "Log masuk pantas sebagai {$user->name} [{$badge}].");
     }
 }
+

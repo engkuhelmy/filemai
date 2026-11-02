@@ -19,8 +19,8 @@ class StoreEpisodeRequest extends FormRequest
             return false;
         }
 
-        // Admin can add episodes to any drama
-        if ($user->isAdmin()) {
+        // Admin or Creator can add episodes to dramas
+        if ($user->isAdmin() || $user->isCreator()) {
             return true;
         }
 
