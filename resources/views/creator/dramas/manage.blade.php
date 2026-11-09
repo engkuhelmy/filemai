@@ -33,6 +33,17 @@
                         <i data-lucide="eye" class="w-3.5 h-3.5"></i>
                         {{ number_format($drama->views_count) }} Tontonan
                     </span>
+                    @if ($drama->canEditIdentity())
+                        <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1" title="Peraturan 24 Jam: Boleh tukar tajuk dan poster">
+                            <i data-lucide="clock" class="w-3 h-3"></i>
+                            Baki edit tajuk & poster: {{ $drama->remainingEditTime() ?? '24j' }}
+                        </span>
+                    @else
+                        <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30 flex items-center gap-1" title="Peraturan 24 Jam: Tajuk dan poster telah dikunci">
+                            <i data-lucide="lock" class="w-3 h-3"></i>
+                            Tajuk & Poster Dikunci (Lepas 24 Jam)
+                        </span>
+                    @endif
                 </div>
                 <h1 class="text-xl sm:text-2xl font-black text-white truncate">{{ $drama->title }}</h1>
                 <p class="text-xs sm:text-sm text-slate-400 line-clamp-2 max-w-2xl leading-relaxed">
@@ -42,7 +53,12 @@
         </div>
 
         <!-- Action Buttons -->
-        <div class="flex items-center gap-3 shrink-0 w-full sm:w-auto justify-end">
+        <div class="flex items-center gap-3 shrink-0 w-full sm:w-auto justify-end flex-wrap">
+            <a href="{{ route('creator.dramas.edit', $drama) }}" 
+               class="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-bold border border-white/10 transition-colors flex items-center gap-1.5">
+                <i data-lucide="edit" class="w-3.5 h-3.5 text-red-500"></i>
+                <span>Edit Siri Drama</span>
+            </a>
             <a href="{{ route('drama.show', $drama->slug) }}" target="_blank"
                class="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-200 text-xs font-bold border border-white/10 transition-colors flex items-center gap-1.5">
                 <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
@@ -148,6 +164,19 @@
                                 </span>
                                 <span>•</span>
                                 <span>{{ $episode->created_at ? $episode->created_at->diffForHumans() : 'Baru' }}</span>
+                                @if ($episode->canEditTitle())
+                                    <span>•</span>
+                                    <span class="text-emerald-400 font-semibold flex items-center gap-1" title="Peraturan 24 Jam: Boleh ubah tajuk">
+                                        <i data-lucide="clock" class="w-3 h-3"></i>
+                                        Baki edit tajuk: {{ $episode->remainingEditTime() ?? '24j' }}
+                                    </span>
+                                @else
+                                    <span>•</span>
+                                    <span class="text-slate-500 font-medium flex items-center gap-1" title="Tajuk dikunci selepas 24 jam">
+                                        <i data-lucide="lock" class="w-3 h-3 text-amber-500/70"></i>
+                                        Tajuk dikunci
+                                    </span>
+                                @endif
                             </div>
                         </div>
                     </div>

@@ -107,19 +107,26 @@ class EpisodeController extends Controller
      */
     public function edit(Drama $drama, Episode $episode): View
     {
+        $user = auth()->user();
         return view('creator.episodes.edit', [
             'drama' => $drama,
             'episode' => $episode,
+            'canEditTitle' => $episode->canEditTitle($user),
+            'remainingTime' => $episode->remainingEditTime(),
         ]);
     }
 
     /**
      * Update an existing episode.
+     * Enforces the 24-hour rule: episode title can only be changed within 24 hours of creation.
      */
     public function update(Request $request, Drama $drama, Episode $episode): RedirectResponse
     {
+        $user = auth()->user();
+        $canEditTitle = $episode->canEditTitle($user);
+
         $validated = $request->validate([
-            'title' => 'required|string|max:255',
+            'title' => $canEditTitle ? 'required|string|max:255' : 'nullable|string|max:255',
             'episode_number' => 'required|integer|min:1',
             'video_type' => 'required|in:storage,youtube,coming_soon',
             'youtube_url' => 'nullable|string',
@@ -131,6 +138,15 @@ class EpisodeController extends Controller
             'title.required' => 'Tajuk episod wajib diisi.',
             'episode_number.required' => 'Nombor episod wajib diisi.',
         ]);
+
+        // Enforce 24-hour title rule
+        $finalTitle = $episode->title;
+        $attemptedTitleChange = false;
+        if ($canEditTitle && !empty($validated['title'])) {
+            $finalTitle = trim($validated['title']);
+        } elseif (!$canEditTitle && $request->filled('title') && trim($request->input('title')) !== $episode->title) {
+            $attemptedTitleChange = true;
+        }
 
         $videoType = $validated['video_type'];
         $youtubeVideoId = null;
@@ -175,7 +191,7 @@ class EpisodeController extends Controller
         }
 
         $episode->update([
-            'title' => $validated['title'],
+            'title' => $finalTitle,
             'episode_number' => $validated['episode_number'],
             'video_type' => $isComingSoon ? 'storage' : $videoType,
             'video_source' => $videoSource,
@@ -187,10 +203,11 @@ class EpisodeController extends Controller
         ]);
 
         $statusText = $isComingSoon ? 'Akan Datang (Coming Soon)' : 'Telah Diterbitkan dengan Video';
+        $notice = $attemptedTitleChange ? " (Perhatian: Tajuk episod tidak diubah kerana peraturan 24 jam telah tamat)" : "";
 
         return redirect()
             ->route('creator.dramas.manage', $drama)
-            ->with('success', "Episod {$episode->episode_number} (\"{$episode->title}\") berjaya dikemaskini [Status: {$statusText}]!");
+            ->with('success', "Episod {$episode->episode_number} (\"{$episode->title}\") berjaya dikemaskini [Status: {$statusText}]{$notice}!");
     }
 
     /**

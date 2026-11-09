@@ -142,6 +142,15 @@ Route::middleware(['auth'])->prefix('creator')->name('creator.')->group(function
     Route::get('/dramas/{drama}', [CreatorDramaController::class, 'manage'])
         ->name('dramas.manage');
 
+    // Edit Drama Details (Subject to 24-hour rule for title & poster)
+    Route::get('/dramas/{drama}/edit', [CreatorDramaController::class, 'edit'])
+        ->name('dramas.edit');
+
+    // Update Drama Details
+    Route::put('/dramas/{drama}', [CreatorDramaController::class, 'update'])
+        ->name('dramas.update');
+    Route::post('/dramas/{drama}/update', [CreatorDramaController::class, 'update']);
+
     // Friendly alias for singular drama URL
     Route::get('/drama/{drama}', function (Drama $drama) {
         return redirect()->route('creator.dramas.manage', $drama);

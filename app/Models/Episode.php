@@ -126,4 +126,54 @@ class Episode extends Model
         $duration = $this->duration ?? 60;
         return gmdate('i:s', $duration);
     }
+
+    /**
+     * Check if episode title/name can still be edited (within 24 hours of creation).
+     * Super Admins can always edit.
+     */
+    public function canEditTitle(?User $user = null): bool
+    {
+        $user = $user ?? auth()->user();
+        if ($user && method_exists($user, 'isAdmin') && $user->isAdmin()) {
+            return true;
+        }
+
+        if (!$this->created_at) {
+            return true;
+        }
+
+        return $this->created_at->diffInHours(now()) < 24;
+    }
+
+    /**
+     * Check if title is locked after 24 hours.
+     */
+    public function isTitleLocked(?User $user = null): bool
+    {
+        return !$this->canEditTitle($user);
+    }
+
+    /**
+     * Human-readable remaining time to edit title (e.g. '23 jam 15 minit lagi').
+     */
+    public function remainingEditTime(): ?string
+    {
+        if (!$this->created_at) {
+            return null;
+        }
+
+        $deadline = $this->created_at->copy()->addHours(24);
+        if (now()->greaterThanOrEqualTo($deadline)) {
+            return null;
+        }
+
+        $diffHours = (int) now()->diffInHours($deadline, false);
+        $diffMinutes = (int) (now()->diffInMinutes($deadline, false) % 60);
+
+        if ($diffHours > 0) {
+            return "{$diffHours} jam {$diffMinutes} minit lagi";
+        }
+
+        return "{$diffMinutes} minit lagi";
+    }
 }

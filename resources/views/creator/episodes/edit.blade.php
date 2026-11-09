@@ -103,7 +103,7 @@
             @method('PUT')
 
             <!-- Error Alerts -->
-            @if ($errors->any())
+            @if (isset($errors) && $errors->any())
                 <div class="p-4 rounded-2xl bg-red-950/80 border border-red-500/50 text-red-200 text-xs space-y-1">
                     <div class="font-bold flex items-center gap-1.5 text-red-400">
                         <i data-lucide="alert-circle" class="w-4 h-4 shrink-0"></i>
@@ -133,15 +133,43 @@
                 </div>
 
                 <div class="sm:col-span-3 space-y-1.5">
-                    <label for="title" class="block text-xs font-bold text-slate-300">
-                        Tajuk Episod <span class="text-red-500">*</span>
-                    </label>
-                    <input type="text" 
-                           id="title" 
-                           name="title" 
-                           value="{{ old('title', $episode->title) }}" 
-                           required 
-                           class="w-full bg-slate-950 text-white text-sm px-4 py-3 rounded-2xl border border-white/10 focus:outline-none focus:border-red-500">
+                    <div class="flex items-center justify-between">
+                        <label for="title" class="block text-xs font-bold text-slate-300">
+                            Tajuk Episod <span class="text-red-500">*</span>
+                        </label>
+                        @if ($canEditTitle)
+                            <span class="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded-md flex items-center gap-1">
+                                <i data-lucide="clock" class="w-3 h-3"></i>
+                                Baki edit tajuk: {{ $remainingTime ?? '24 jam' }}
+                            </span>
+                        @else
+                            <span class="text-[10px] font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-md flex items-center gap-1">
+                                <i data-lucide="lock" class="w-3 h-3"></i>
+                                Tajuk Dikunci (Peraturan 24 Jam)
+                            </span>
+                        @endif
+                    </div>
+                    @if ($canEditTitle)
+                        <input type="text" 
+                               id="title" 
+                               name="title" 
+                               value="{{ old('title', $episode->title) }}" 
+                               required 
+                               class="w-full bg-slate-950 text-white text-sm px-4 py-3 rounded-2xl border border-white/10 focus:outline-none focus:border-red-500">
+                    @else
+                        <div class="relative">
+                            <input type="text" 
+                                   id="title" 
+                                   name="title" 
+                                   value="{{ $episode->title }}" 
+                                   readonly 
+                                   class="w-full bg-slate-900/60 text-slate-400 text-sm px-4 py-3 pl-10 rounded-2xl border border-white/5 cursor-not-allowed font-medium select-none focus:outline-none">
+                            <i data-lucide="lock" class="w-4 h-4 text-slate-500 absolute left-3.5 top-3.5"></i>
+                        </div>
+                        <p class="text-[11px] text-slate-500 italic">
+                            Tajuk hanya boleh ditukar dalam tempoh 24 jam pertama. Anda masih boleh menukar video atau tetapan lain.
+                        </p>
+                    @endif
                 </div>
             </div>
 

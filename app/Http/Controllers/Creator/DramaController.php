@@ -226,4 +226,136 @@ class DramaController extends Controller
             'episodes' => $episodes,
         ]);
     }
+
+    /**
+     * Show form to edit drama details.
+     * Poster and title are only editable within 24 hours of creation.
+     */
+    public function edit(Drama $drama): View
+    {
+        $user = auth()->user();
+        if ($user && method_exists($user, 'isAdmin') && !$user->isAdmin() && $drama->creator_id && $drama->creator_id !== $user->id) {
+            abort(403, 'Anda tidak mempunyai kebenaran untuk menguruskan siri drama ini.');
+        }
+
+        $genres = ['Romance', 'Action', 'Thriller', 'Revenge', 'CEO', 'Drama', 'Komedi', 'Fantasi', 'Misteri'];
+
+        return view('creator.dramas.edit', [
+            'drama' => $drama,
+            'genres' => $genres,
+            'canEditIdentity' => $drama->canEditIdentity($user),
+            'remainingTime' => $drama->remainingEditTime(),
+        ]);
+    }
+
+    /**
+     * Update drama details.
+     * Enforces the 24-hour rule: poster and title can only be changed within 24 hours of creation.
+     */
+    public function update(Request $request, Drama $drama): RedirectResponse
+    {
+        $user = auth()->user();
+        if ($user && method_exists($user, 'isAdmin') && !$user->isAdmin() && $drama->creator_id && $drama->creator_id !== $user->id) {
+            abort(403, 'Anda tidak mempunyai kebenaran untuk mengemaskini siri drama ini.');
+        }
+
+        $canEditIdentity = $drama->canEditIdentity($user);
+
+        $rules = [
+            'genre' => 'required|string|max:100',
+            'type' => 'nullable|in:series,movie',
+            'status' => 'nullable|in:published,draft,completed',
+            'synopsis' => 'nullable|string',
+        ];
+
+        if ($canEditIdentity) {
+            $rules['title'] = 'required|string|max:255';
+            $rules['poster_file'] = 'nullable|file|mimes:jpeg,png,jpg,webp|max:5120';
+            $rules['poster_url'] = 'nullable|string|max:500';
+            $rules['banner_file'] = 'nullable|file|mimes:jpeg,png,jpg,webp|max:5120';
+            $rules['banner_url'] = 'nullable|string|max:500';
+        } else {
+            $rules['title'] = 'nullable|string|max:255';
+        }
+
+        $validated = $request->validate($rules, [
+            'title.required' => 'Tajuk drama wajib diisi.',
+            'genre.required' => 'Sila pilih genre drama.',
+            'poster_file.mimes' => 'Format poster mestilah JPG, PNG, atau WebP.',
+            'poster_file.max' => 'Saiz poster maksimum ialah 5MB.',
+        ]);
+
+        $attemptedIdentityChange = false;
+
+        // Check and apply Title change (24-hour rule)
+        if ($canEditIdentity && !empty($validated['title'])) {
+            $newTitle = trim($validated['title']);
+            if ($newTitle !== $drama->title) {
+                $drama->title = $newTitle;
+                $baseSlug = Str::slug($newTitle);
+                if (empty($baseSlug)) {
+                    $baseSlug = 'drama-' . $drama->id;
+                }
+                $slug = $baseSlug;
+                $counter = 1;
+                while (Drama::where('slug', $slug)->where('id', '!=', $drama->id)->exists()) {
+                    $slug = $baseSlug . '-' . $counter++;
+                }
+                $drama->slug = $slug;
+            }
+        } elseif (!$canEditIdentity && $request->filled('title') && trim($request->input('title')) !== $drama->title) {
+            $attemptedIdentityChange = true;
+        }
+
+        // Check and apply Poster change (24-hour rule)
+        if ($canEditIdentity) {
+            if ($request->hasFile('poster_file') && $request->file('poster_file')->isValid()) {
+                $file = $request->file('poster_file');
+                $filename = 'poster_' . time() . '_' . Str::random(6) . '.' . $file->getClientOriginalExtension();
+                $destDir = public_path('uploads/posters');
+                if (!file_exists($destDir)) {
+                    @mkdir($destDir, 0775, true);
+                }
+                $file->move($destDir, $filename);
+                $drama->poster_url = '/uploads/posters/' . $filename;
+            } elseif (!empty($validated['poster_url'])) {
+                $drama->poster_url = trim($validated['poster_url']);
+            }
+
+            if ($request->hasFile('banner_file') && $request->file('banner_file')->isValid()) {
+                $file = $request->file('banner_file');
+                $filename = 'banner_' . time() . '_' . Str::random(6) . '.' . $file->getClientOriginalExtension();
+                $destDir = public_path('uploads/posters');
+                if (!file_exists($destDir)) {
+                    @mkdir($destDir, 0775, true);
+                }
+                $file->move($destDir, $filename);
+                $drama->banner_url = '/uploads/posters/' . $filename;
+            } elseif (!empty($validated['banner_url'])) {
+                $drama->banner_url = trim($validated['banner_url']);
+            }
+        } elseif (!$canEditIdentity && ($request->hasFile('poster_file') || $request->hasFile('banner_file'))) {
+            $attemptedIdentityChange = true;
+        }
+
+        // Always update metadata
+        $drama->synopsis = trim($validated['synopsis'] ?? '');
+        $drama->genre = $validated['genre'];
+        $drama->type = $validated['type'] ?? $drama->type ?? 'series';
+        if (!empty($validated['status'])) {
+            $drama->status = $validated['status'];
+        }
+
+        $drama->save();
+
+        if ($attemptedIdentityChange) {
+            return redirect()
+                ->route('creator.dramas.manage', $drama)
+                ->with('info', "Maklumat siri drama dikemaskini. Perhatian: Tajuk & poster TIDAK diubah kerana peraturan 24 jam (hanya boleh ditukar dalam tempoh 24 jam selepas dicipta).");
+        }
+
+        return redirect()
+            ->route('creator.dramas.manage', $drama)
+            ->with('success', "Maklumat siri drama '{$drama->title}' berjaya dikemaskini!");
+    }
 }

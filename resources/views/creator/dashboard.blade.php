@@ -107,6 +107,19 @@
                                 <span class="text-xs text-slate-400">
                                     {{ number_format($drama->views_count) }} Tontonan
                                 </span>
+                                @if ($drama->canEditIdentity())
+                                    <span>•</span>
+                                    <span class="text-[10px] font-bold text-emerald-400 flex items-center gap-1" title="Peraturan 24 Jam: Boleh edit tajuk & poster">
+                                        <i data-lucide="clock" class="w-3 h-3"></i>
+                                        Baki: {{ $drama->remainingEditTime() ?? '24j' }}
+                                    </span>
+                                @else
+                                    <span>•</span>
+                                    <span class="text-[10px] font-medium text-slate-500 flex items-center gap-1" title="Tajuk & poster dikunci selepas 24 jam">
+                                        <i data-lucide="lock" class="w-2.5 h-2.5 text-amber-500/80"></i>
+                                        Dikunci
+                                    </span>
+                                @endif
                             </div>
 
                             <h3 class="text-base font-bold text-white truncate">{{ $drama->title }}</h3>
@@ -125,6 +138,13 @@
                         </a>
 
                         <div class="flex items-center gap-2">
+                            <a href="{{ route('creator.dramas.edit', $drama) }}" 
+                               class="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/15 text-slate-200 hover:text-white font-bold transition-colors flex items-center gap-1 border border-white/5"
+                               title="Kemaskini Maklumat Siri Drama">
+                                <i data-lucide="edit-3" class="w-3.5 h-3.5 text-red-500"></i>
+                                <span>Edit</span>
+                            </a>
+
                             <a href="{{ route('creator.dramas.episodes.create', $drama) }}" 
                                class="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold transition-colors flex items-center gap-1">
                                 <i data-lucide="plus" class="w-3.5 h-3.5"></i>
