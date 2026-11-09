@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Drama;
 use App\Models\Episode;
 use App\Models\EpisodeView;
+use App\Models\CreatorWallet;
 use App\Models\Ad;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -28,6 +29,9 @@ class EpisodeWatchController extends Controller
 
         // Record real view event with device, browser, IP and user analytics
         EpisodeView::recordView($drama, $episode, $request);
+
+        // Credit creator watch earnings per 1-minute block (e.g. RM 0.0001/block)
+        CreatorWallet::recordViewEarnings($drama, $episode);
 
         // Increment real views counters
         $episode->increment('views_count');

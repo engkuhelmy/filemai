@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Creator;
 use App\Http\Controllers\Controller;
 use App\Models\Drama;
 use App\Models\Episode;
+use App\Models\CreatorWallet;
+use App\Models\SystemSetting;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
@@ -32,10 +34,15 @@ class DramaController extends Controller
         $totalViews = $dramas->sum('views_count');
         $totalEpisodes = $dramas->sum('episodes_count');
 
+        $wallet = CreatorWallet::forUser($user->id);
+        $ratePerBlock = SystemSetting::get('creator_earnings_rate_per_block', 0.000100);
+
         return view('creator.dashboard', [
             'dramas' => $dramas,
             'totalViews' => $totalViews,
             'totalEpisodes' => $totalEpisodes,
+            'wallet' => $wallet,
+            'ratePerBlock' => $ratePerBlock,
         ]);
     }
 

@@ -31,8 +31,8 @@
                     <h3 class="text-2xl sm:text-3xl font-black text-white uppercase font-['Bebas_Neue','Inter',sans-serif]">Filemai VIP Pass</h3>
                 </div>
                 <div class="text-right">
-                    <span class="text-3xl sm:text-4xl font-black text-[#E50914]">RM 5</span>
-                    <span class="text-xs text-slate-400">/ 30 hari</span>
+                    <span class="text-3xl sm:text-4xl font-black text-[#E50914]">RM {{ number_format($monthlyPrice ?? 14.90, 2) }}</span>
+                    <span class="text-xs text-slate-400 block">/ 30 hari</span>
                 </div>
             </div>
 
@@ -82,7 +82,7 @@
                         <a href="{{ route('demo.switch', 5) }}" 
                            class="w-full py-4 rounded-full bg-[#E50914] hover:bg-[#F40612] text-white font-black text-sm shadow-xl shadow-red-950/80 hover:scale-[1.02] transition-all flex items-center justify-center gap-2">
                             <i data-lucide="sparkles" class="w-4 h-4 fill-white"></i>
-                            Langgan VIP Sekarang (RM 5.00)
+                            Langgan VIP Sekarang (RM {{ number_format($monthlyPrice ?? 14.90, 2) }})
                         </a>
                         <p class="text-center text-[11px] text-slate-500">
                             Pembayaran selamat melalui ToyyibPay FPX, DuitNow QR & Kad. Boleh dibatalkan bila-bila masa.
@@ -94,7 +94,7 @@
                     <a href="{{ route('login') }}" 
                        class="w-full py-4 rounded-full bg-[#E50914] hover:bg-[#F40612] text-white font-black text-sm shadow-xl shadow-red-950/80 hover:scale-[1.02] transition-all flex items-center justify-center gap-2">
                         <i data-lucide="sparkles" class="w-4 h-4 fill-white"></i>
-                        Log Masuk untuk Langgan (RM 5.00)
+                        Log Masuk untuk Langgan (RM {{ number_format($monthlyPrice ?? 14.90, 2) }})
                     </a>
                     <p class="text-center text-[11px] text-slate-500">
                         Belum ada akaun? <a href="{{ route('register') }}" class="text-white hover:underline font-bold">Daftar percuma</a> dahulu.
@@ -102,6 +102,61 @@
                 </div>
             @endauth
 
+        </div>
+    </div>
+
+    <!-- Pakej Menjadi Video Creator Section -->
+    <div class="relative max-w-lg mx-auto pt-6">
+        <div class="rounded-3xl bg-slate-900 border border-purple-500/30 p-6 sm:p-8 shadow-2xl space-y-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <span class="text-xs font-bold uppercase tracking-wider text-purple-400">Pakej Pembikin Video</span>
+                    <h3 class="text-2xl font-black text-white uppercase font-['Bebas_Neue','Inter',sans-serif]">Lesen Video Creator</h3>
+                </div>
+                <div class="text-right">
+                    <span class="text-3xl font-black text-purple-400 font-mono">RM {{ number_format($creatorPackage ?? 50.00, 2) }}</span>
+                    <span class="text-xs text-slate-400 block">sekali seumur hidup</span>
+                </div>
+            </div>
+
+            <ul class="space-y-3 text-xs text-slate-300 border-t border-b border-white/10 py-5">
+                <li class="flex items-center gap-2.5">
+                    <i data-lucide="check" class="w-4 h-4 text-purple-400 shrink-0"></i>
+                    <span><strong>Akses Creator Studio:</strong> Cipta siri drama tanpa had & upload episod 9:16.</span>
+                </li>
+                <li class="flex items-center gap-2.5">
+                    <i data-lucide="check" class="w-4 h-4 text-emerald-400 shrink-0"></i>
+                    <span><strong>Royalti Tontonan Per Blok:</strong> Terima RM 0.0001 setiap 1 minit penuh penonton menonton karya anda.</span>
+                </li>
+                <li class="flex items-center gap-2.5">
+                    <i data-lucide="check" class="w-4 h-4 text-purple-400 shrink-0"></i>
+                    <span><strong>Dompet & Payout:</strong> Penyata kewangan langsung & pemindahan ke akaun bank tempatan.</span>
+                </li>
+            </ul>
+
+            <div class="space-y-2">
+                @auth
+                    @if (auth()->user()->isCreator())
+                        <a href="{{ route('creator.dashboard') }}" 
+                           class="w-full py-3.5 rounded-full bg-purple-600 hover:bg-purple-500 text-white font-black text-xs text-center flex items-center justify-center gap-2 transition-all">
+                            <i data-lucide="clapperboard" class="w-4 h-4"></i>
+                            Akaun Anda Telah Diaktifkan Sebagai Creator (Buka Studio)
+                        </a>
+                    @else
+                        <a href="{{ route('demo.switch', 2) }}" 
+                           class="w-full py-3.5 rounded-full bg-purple-600 hover:bg-purple-500 text-white font-black text-xs text-center flex items-center justify-center gap-2 transition-all shadow-lg shadow-purple-950/80">
+                            <i data-lucide="video" class="w-4 h-4"></i>
+                            Daftar Pakej Creator Sekarang (RM {{ number_format($creatorPackage ?? 50.00, 2) }})
+                        </a>
+                    @endif
+                @else
+                    <a href="{{ route('register') }}" 
+                       class="w-full py-3.5 rounded-full bg-purple-600 hover:bg-purple-500 text-white font-black text-xs text-center flex items-center justify-center gap-2 transition-all shadow-lg shadow-purple-950/80">
+                        <i data-lucide="video" class="w-4 h-4"></i>
+                        Daftar Akaun & Beli Pakej Creator (RM {{ number_format($creatorPackage ?? 50.00, 2) }})
+                    </a>
+                @endauth
+            </div>
         </div>
     </div>
 

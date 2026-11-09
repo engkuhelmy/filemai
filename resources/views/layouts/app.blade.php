@@ -203,6 +203,11 @@
                                     <i data-lucide="layout-dashboard" class="w-4 h-4 text-purple-400"></i>
                                     <span>Admin Dashboard</span>
                                 </a>
+                                <a href="{{ route('admin.settings') }}" 
+                                   class="flex items-center gap-2.5 px-3 py-2 rounded-xl text-purple-300 hover:bg-purple-500/15 font-bold transition-colors">
+                                    <i data-lucide="sliders" class="w-4 h-4 text-purple-400"></i>
+                                    <span>Tetapan Harga & Royalti</span>
+                                </a>
                             @endif
 
                             @if (auth()->user()->isCreator())
@@ -210,6 +215,11 @@
                                    class="flex items-center gap-2.5 px-3 py-2 rounded-xl text-slate-200 hover:bg-white/10 hover:text-white transition-colors">
                                     <i data-lucide="clapperboard" class="w-4 h-4 text-red-500"></i>
                                     <span>Creator Studio</span>
+                                </a>
+                                <a href="{{ route('creator.wallet') }}" 
+                                   class="flex items-center gap-2.5 px-3 py-2 rounded-xl text-emerald-300 hover:bg-emerald-500/15 hover:text-emerald-200 font-bold transition-colors">
+                                    <i data-lucide="wallet" class="w-4 h-4 text-emerald-400"></i>
+                                    <span>Dompet & Royalti (RM)</span>
                                 </a>
                                 <a href="{{ route('creator.dramas.create') }}" 
                                    class="flex items-center gap-2.5 px-3 py-2 rounded-xl text-slate-200 hover:bg-white/10 hover:text-white transition-colors">
@@ -389,6 +399,11 @@
                             <i data-lucide="layout-dashboard" class="w-5 h-5 text-purple-400"></i>
                             <span>Admin Dashboard</span>
                         </a>
+                        <a href="{{ route('admin.settings') }}" 
+                           class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-purple-300 hover:bg-purple-500/15 font-bold transition-colors">
+                            <i data-lucide="sliders" class="w-5 h-5 text-purple-400"></i>
+                            <span>Tetapan Harga & Royalti</span>
+                        </a>
                     @endif
 
                     @if (auth()->user()->isCreator())
@@ -396,6 +411,11 @@
                            class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-200 hover:bg-white/10 hover:text-white transition-colors">
                             <i data-lucide="clapperboard" class="w-5 h-5 text-red-500"></i>
                             <span class="font-semibold">Creator Studio</span>
+                        </a>
+                        <a href="{{ route('creator.wallet') }}" 
+                           class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-emerald-300 hover:bg-emerald-500/15 font-bold transition-colors">
+                            <i data-lucide="wallet" class="w-5 h-5 text-emerald-400"></i>
+                            <span>Dompet Royalti</span>
                         </a>
                         <a href="{{ route('creator.dramas.create') }}" 
                            class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-200 hover:bg-white/10 hover:text-white transition-colors">

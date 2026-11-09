@@ -115,11 +115,19 @@ Route::get('/watch/{episode}', function (Episode $episode) {
     ]);
 })->name('watch.direct');
 
-// Admin Analytics Dashboard (Protected by auth and admin middleware)
+// Admin Analytics & Settings (Protected by auth and admin middleware)
 Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/', [\App\Http\Controllers\Admin\DashboardController::class, 'index'])
         ->name('dashboard');
     Route::get('/dashboard', [\App\Http\Controllers\Admin\DashboardController::class, 'index']);
+
+    // Admin Settings: Pricing for Viewer Subscription, Creator Package & Watch Earnings per Block
+    Route::get('/settings', [\App\Http\Controllers\Admin\SettingController::class, 'index'])
+        ->name('settings');
+    Route::post('/settings', [\App\Http\Controllers\Admin\SettingController::class, 'update'])
+        ->name('settings.update');
+    Route::post('/settings/payout/{payout}', [\App\Http\Controllers\Admin\SettingController::class, 'updatePayout'])
+        ->name('settings.payout.update');
 });
 
 // Creator Studio Episode & Drama Management (Protected by auth)
@@ -128,6 +136,14 @@ Route::middleware(['auth'])->prefix('creator')->name('creator.')->group(function
     // Creator Studio Dashboard
     Route::get('/', [CreatorDramaController::class, 'dashboard'])
         ->name('dashboard');
+
+    // Creator Wallet & Royalty Collection (Terkumpul, Dikeluarkan, Baki)
+    Route::get('/wallet', [\App\Http\Controllers\Creator\WalletController::class, 'index'])
+        ->name('wallet');
+    Route::post('/wallet/withdraw', [\App\Http\Controllers\Creator\WalletController::class, 'withdraw'])
+        ->name('wallet.withdraw');
+    Route::get('/earnings', function () { return redirect()->route('creator.wallet'); });
+    Route::get('/collection', function () { return redirect()->route('creator.wallet'); });
 
     // Create New Drama Form (Placed before {drama} parameter route)
     Route::get('/dramas/create', [CreatorDramaController::class, 'create'])
@@ -208,8 +224,14 @@ Route::get('/demo/switch/{id}', [AuthController::class, 'demoSwitch'])->name('de
 
 // VIP Subscription Info Page
 Route::get('/subscribe', function () {
+    $monthlyPrice = \App\Models\SystemSetting::get('viewer_vip_monthly_price', 14.90);
+    $yearlyPrice = \App\Models\SystemSetting::get('viewer_vip_yearly_price', 129.90);
+    $creatorPackage = \App\Models\SystemSetting::get('creator_package_price', 50.00);
     return view('subscribe', [
-        'title' => 'Langgan Pas VIP Filemai - RM5 / Bulan',
+        'title' => "Langgan Pas VIP Filemai - RM " . number_format($monthlyPrice, 2) . " / Bulan",
+        'monthlyPrice' => $monthlyPrice,
+        'yearlyPrice' => $yearlyPrice,
+        'creatorPackage' => $creatorPackage,
     ]);
 })->name('subscribe');
 

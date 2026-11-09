@@ -83,4 +83,36 @@ class User extends Authenticatable
     {
         return $this->hasMany(Drama::class, 'creator_id');
     }
+
+    /**
+     * Creator royalty wallet.
+     */
+    public function wallet(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(CreatorWallet::class, 'user_id');
+    }
+
+    /**
+     * Get or create wallet.
+     */
+    public function getWallet(): CreatorWallet
+    {
+        return CreatorWallet::forUser($this->id);
+    }
+
+    /**
+     * Earning audit logs.
+     */
+    public function earningLogs(): HasMany
+    {
+        return $this->hasMany(CreatorEarningLog::class, 'creator_id');
+    }
+
+    /**
+     * Payout requests.
+     */
+    public function payouts(): HasMany
+    {
+        return $this->hasMany(CreatorPayout::class, 'creator_id');
+    }
 }

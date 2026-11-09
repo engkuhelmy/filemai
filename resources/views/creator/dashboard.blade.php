@@ -18,6 +18,12 @@
         </div>
 
         <div class="flex items-center gap-3">
+            <a href="{{ route('creator.wallet') }}" 
+               class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 font-bold text-xs border border-emerald-500/30 transition-colors">
+                <i data-lucide="wallet" class="w-4 h-4 text-emerald-400"></i>
+                <span>Dompet Royalti</span>
+            </a>
+
             <a href="{{ route('creator.dramas.create') }}" 
                class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#E50914] hover:bg-[#F40612] text-white font-black text-xs shadow-lg shadow-red-950/80 transition-all hover:scale-105">
                 <i data-lucide="plus-circle" class="w-4 h-4"></i>
@@ -33,6 +39,89 @@
             @endif
         </div>
     </div>
+
+    <!-- SEKSYEN KOLEKSI DUIT CREATOR (Terkumpul, Dikeluarkan, Baki) -->
+    @if (isset($wallet))
+        <div class="space-y-3">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <h2 class="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
+                        <span>Koleksi Pendapatan & Royalti Tontonan</span>
+                    </h2>
+                </div>
+                <div class="flex items-center gap-2 text-xs">
+                    <span class="text-slate-400 hidden sm:inline">Kadar:</span>
+                    <span class="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
+                        RM {{ number_format($ratePerBlock ?? 0.0001, 6) }} / blok (1 minit)
+                    </span>
+                    <a href="{{ route('creator.wallet') }}" class="text-xs text-red-400 hover:text-red-300 font-bold flex items-center gap-1 transition-colors ml-2">
+                        Penyata Penuh <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                    </a>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                
+                <!-- 1. Duit Terkumpul -->
+                <div class="p-5 rounded-3xl bg-slate-900 border border-emerald-500/30 shadow-xl relative overflow-hidden group hover:border-emerald-500/50 transition-all">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Duit Terkumpul</span>
+                        <div class="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
+                            <i data-lucide="wallet" class="w-4 h-4"></i>
+                        </div>
+                    </div>
+                    <div class="mt-2 space-y-0.5">
+                        <h3 class="text-2xl sm:text-3xl font-black text-emerald-400 font-mono tracking-tight">
+                            RM {{ number_format($wallet->total_earned, 4) }}
+                        </h3>
+                        <p class="text-[11px] text-slate-500">
+                            Daripada <strong class="text-slate-300">{{ number_format($wallet->total_blocks) }}</strong> blok tontonan layak
+                        </p>
+                    </div>
+                </div>
+
+                <!-- 2. Telah Dikeluarkan -->
+                <div class="p-5 rounded-3xl bg-slate-900 border border-white/10 shadow-xl relative overflow-hidden group hover:border-white/20 transition-all">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Telah Dikeluarkan</span>
+                        <div class="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center">
+                            <i data-lucide="arrow-up-right" class="w-4 h-4"></i>
+                        </div>
+                    </div>
+                    <div class="mt-2 space-y-0.5">
+                        <h3 class="text-2xl sm:text-3xl font-black text-amber-400 font-mono tracking-tight">
+                            RM {{ number_format($wallet->total_withdrawn, 2) }}
+                        </h3>
+                        <p class="text-[11px] text-slate-500">
+                            Telah dipindahkan ke akaun bank
+                        </p>
+                    </div>
+                </div>
+
+                <!-- 3. Baki Semasa -->
+                <div class="p-5 rounded-3xl bg-gradient-to-br from-slate-900 to-slate-950 border border-red-500/40 shadow-xl relative overflow-hidden group hover:border-red-500/70 transition-all">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold text-slate-300 uppercase tracking-wider">Baki Semasa Tersedia</span>
+                        <a href="{{ route('creator.wallet') }}" 
+                           class="px-2.5 py-1 rounded-lg bg-red-600 hover:bg-red-500 text-white font-bold text-[10px] transition-all flex items-center gap-1 shadow-md">
+                            <span>Tuntut</span>
+                            <i data-lucide="chevron-right" class="w-3 h-3"></i>
+                        </a>
+                    </div>
+                    <div class="mt-2 space-y-0.5">
+                        <h3 class="text-2xl sm:text-3xl font-black text-white font-mono tracking-tight">
+                            RM {{ number_format($wallet->current_balance, 4) }}
+                        </h3>
+                        <p class="text-[11px] text-slate-400">
+                            Boleh dimohon keluar ke bank bila-bila masa
+                        </p>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    @endif
 
     <!-- Analytics KPI Cards -->
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">

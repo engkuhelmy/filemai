@@ -48,6 +48,11 @@
             </div>
 
             <div class="flex items-center gap-2">
+                <a href="{{ route('admin.settings') }}" 
+                   class="px-3.5 py-2.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 hover:text-white text-xs font-bold border border-purple-500/30 transition-colors flex items-center gap-1.5">
+                    <i data-lucide="sliders" class="w-4 h-4 text-purple-400"></i>
+                    <span>Tetapan Harga & Royalti</span>
+                </a>
                 <a href="{{ route('creator.dramas.create') }}" 
                    class="px-4 py-2.5 rounded-xl bg-[#E50914] hover:bg-[#F40612] text-white text-xs font-black shadow-lg shadow-red-950/80 transition-all hover:scale-105 flex items-center gap-1.5">
                     <i data-lucide="plus-circle" class="w-4 h-4"></i>
