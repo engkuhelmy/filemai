@@ -107,7 +107,12 @@
                                 </h3>
 
                                 <!-- Source Type Badge -->
-                                @if ($episode->video_source === 'youtube' || $episode->video_type === 'youtube')
+                                @if ($episode->isComingSoon())
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1">
+                                        <i data-lucide="clock" class="w-3 h-3"></i>
+                                        Akan Datang (Coming Soon)
+                                    </span>
+                                @elseif ($episode->video_source === 'youtube' || $episode->video_type === 'youtube')
                                     <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-red-500/15 text-red-300 border border-red-500/30 flex items-center gap-1 font-mono">
                                         <i data-lucide="youtube" class="w-3 h-3 text-red-400"></i>
                                         {{ $episode->youtube_video_id ?? 'YouTube' }}
@@ -148,12 +153,26 @@
                     </div>
 
                     <!-- Actions Buttons -->
-                    <div class="flex items-center gap-2.5 shrink-0 self-end sm:self-center">
-                        <a href="{{ route('episodes.show', ['drama' => $drama->slug, 'episode' => $episode->episode_number]) }}" 
-                           target="_blank"
-                           class="px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-white text-xs font-bold border border-white/10 transition-colors flex items-center gap-1.5">
-                            <i data-lucide="play" class="w-3.5 h-3.5 fill-white"></i>
-                            <span>Tonton</span>
+                    <div class="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                        @if ($episode->isComingSoon())
+                            <a href="{{ route('creator.dramas.episodes.edit', [$drama, $episode]) }}" 
+                               class="px-3.5 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-bold border border-amber-500/40 transition-colors flex items-center gap-1.5">
+                                <i data-lucide="upload" class="w-3.5 h-3.5"></i>
+                                <span>Pautkan Video</span>
+                            </a>
+                        @else
+                            <a href="{{ route('episodes.show', ['drama' => $drama->slug, 'episode' => $episode->episode_number]) }}" 
+                               target="_blank"
+                               class="px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-white text-xs font-bold border border-white/10 transition-colors flex items-center gap-1.5">
+                                <i data-lucide="play" class="w-3.5 h-3.5 fill-white"></i>
+                                <span>Tonton</span>
+                            </a>
+                        @endif
+
+                        <a href="{{ route('creator.dramas.episodes.edit', [$drama, $episode]) }}" 
+                           class="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 transition-colors"
+                           title="Kemaskini Maklumat Episod">
+                            <i data-lucide="edit-3" class="w-4 h-4"></i>
                         </a>
 
                         <!-- Delete Episode Form -->

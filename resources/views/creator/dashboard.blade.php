@@ -18,10 +18,16 @@
         </div>
 
         <div class="flex items-center gap-3">
+            <a href="{{ route('creator.dramas.create') }}" 
+               class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#E50914] hover:bg-[#F40612] text-white font-black text-xs shadow-lg shadow-red-950/80 transition-all hover:scale-105">
+                <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                <span>Cipta Siri Drama Baharu</span>
+            </a>
+
             @if ($dramas->isNotEmpty())
                 <a href="{{ route('creator.dramas.episodes.create', $dramas->first()) }}" 
-                   class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#E50914] hover:bg-[#F40612] text-white font-black text-xs shadow-lg shadow-red-950/80 transition-all hover:scale-105">
-                    <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                   class="hidden sm:inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-bold text-xs border border-white/10 transition-colors">
+                    <i data-lucide="upload-cloud" class="w-4 h-4 text-red-500"></i>
                     <span>Muat Naik Episod</span>
                 </a>
             @endif

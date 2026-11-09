@@ -177,10 +177,42 @@
                        @click="toggleDirectPlay()">
                 </video>
             @else
-                <!-- No Media Placeholder -->
-                <div class="w-full h-full flex flex-col items-center justify-center p-6 text-center bg-neutral-950">
-                    <i data-lucide="video-off" class="w-12 h-12 text-neutral-600 mb-3"></i>
-                    <p class="text-sm font-semibold text-neutral-400">Media episod belum dimuat naik.</p>
+                <!-- Coming Soon Placeholder Screen -->
+                <div class="relative w-full h-full flex flex-col items-center justify-center p-6 text-center overflow-hidden">
+                    <img src="{{ $bgPoster }}" alt="{{ $drama->title }}" class="absolute inset-0 w-full h-full object-cover blur-2xl scale-125 opacity-25">
+                    <div class="absolute inset-0 bg-gradient-to-t from-black via-black/85 to-black/60"></div>
+
+                    <div class="relative z-10 max-w-xs space-y-4">
+                        <div class="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center mx-auto shadow-xl shadow-amber-950/40">
+                            <i data-lucide="clock" class="w-8 h-8 animate-pulse"></i>
+                        </div>
+                        
+                        <div class="space-y-1.5">
+                            <span class="px-3 py-1 rounded-full text-[10px] font-black tracking-widest uppercase bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                ⏳ AKAN DATANG / COMING SOON
+                            </span>
+                            <h2 class="text-lg font-black text-white pt-1">{{ $episode->title }}</h2>
+                            <p class="text-xs text-slate-400 leading-relaxed">
+                                Episod ini sedang dalam proses penggambaran / suntingan oleh pembikin drama. Nantikan siaran tidak lama lagi!
+                            </p>
+                        </div>
+
+                        <div class="pt-2 flex flex-col gap-2">
+                            <button @click="playlistOpen = true" 
+                                    class="w-full py-2.5 px-4 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-bold transition-all border border-white/10 flex items-center justify-center gap-1.5">
+                                <i data-lucide="list" class="w-4 h-4 text-red-500"></i>
+                                <span>Pilih Episod Lain</span>
+                            </button>
+
+                            @if ($prevEpisode && !$prevEpisode->isComingSoon())
+                                <a href="{{ route('episodes.show', ['drama' => $drama->slug, 'episode' => $prevEpisode->episode_number]) }}"
+                                   class="w-full py-2.5 px-4 rounded-xl bg-[#E50914] hover:bg-[#F40612] text-white text-xs font-bold transition-all shadow-lg flex items-center justify-center gap-1.5">
+                                    <i data-lucide="play" class="w-4 h-4 fill-white"></i>
+                                    <span>Tonton Episod {{ $prevEpisode->episode_number }}</span>
+                                </a>
+                            @endif
+                        </div>
+                    </div>
                 </div>
             @endif
         </div>
@@ -376,13 +408,19 @@
                                     {{ $ep->title }}
                                 </h4>
                                 <div class="flex items-center gap-1.5 text-[10px] {{ $isActive ? 'text-white/80' : 'text-slate-400' }} mt-0.5">
-                                    @if (!empty($epYt))
+                                    @if ($ep->isComingSoon())
+                                        <span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-0.5">
+                                            <i data-lucide="clock" class="w-2.5 h-2.5"></i> Akan Datang
+                                        </span>
+                                    @elseif (!empty($epYt))
                                         <span class="font-bold flex items-center gap-0.5">
                                             <i data-lucide="youtube" class="w-3 h-3 text-red-400"></i> YouTube
                                         </span>
                                         <span>•</span>
+                                        <span>{{ $ep->formatted_duration }}</span>
+                                    @else
+                                        <span>{{ $ep->formatted_duration }}</span>
                                     @endif
-                                    <span>{{ $ep->formatted_duration }}</span>
                                 </div>
                             </div>
                         </div>
@@ -391,6 +429,10 @@
                             @if ($isActive)
                                 <span class="px-2 py-0.5 rounded-full bg-white/20 text-white text-[10px] font-black uppercase">
                                     Sedang Main
+                                </span>
+                            @elseif ($ep->isComingSoon())
+                                <span class="px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 text-[9px] font-bold flex items-center gap-1">
+                                    <i data-lucide="clock" class="w-2.5 h-2.5"></i> Segera
                                 </span>
                             @else
                                 <i data-lucide="play" class="w-4 h-4 text-slate-400 hover:text-white"></i>

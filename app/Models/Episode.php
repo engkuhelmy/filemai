@@ -24,6 +24,7 @@ class Episode extends Model
         'duration',
         'views_count',
         'is_free_preview',
+        'is_coming_soon',
     ];
 
     protected $casts = [
@@ -31,6 +32,7 @@ class Episode extends Model
         'duration' => 'integer',
         'views_count' => 'integer',
         'is_free_preview' => 'boolean',
+        'is_coming_soon' => 'boolean',
     ];
 
     /**
@@ -59,10 +61,26 @@ class Episode extends Model
     }
 
     /**
+     * Check if this episode is coming soon (no movie/video uploaded yet).
+     */
+    public function isComingSoon(): bool
+    {
+        if ($this->is_coming_soon) {
+            return true;
+        }
+
+        return empty($this->youtube_video_id) && empty($this->video_url);
+    }
+
+    /**
      * Check if this episode is sourced from YouTube.
      */
     public function isYouTube(): bool
     {
+        if ($this->isComingSoon()) {
+            return false;
+        }
+
         return $this->video_type === 'youtube' || (!empty($this->video_source) && $this->video_source === 'youtube') || !empty($this->effective_youtube_id);
     }
 
@@ -82,6 +100,10 @@ class Episode extends Model
      */
     public function isStorage(): bool
     {
+        if ($this->isComingSoon()) {
+            return false;
+        }
+
         return !$this->isYouTube();
     }
 

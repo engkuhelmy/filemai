@@ -187,6 +187,11 @@
                                     <i data-lucide="clapperboard" class="w-4 h-4 text-red-500"></i>
                                     <span>Creator Studio</span>
                                 </a>
+                                <a href="{{ route('creator.dramas.create') }}" 
+                                   class="flex items-center gap-2.5 px-3 py-2 rounded-xl text-slate-200 hover:bg-white/10 hover:text-white transition-colors">
+                                    <i data-lucide="folder-plus" class="w-4 h-4 text-purple-400"></i>
+                                    <span>Cipta Siri Baharu</span>
+                                </a>
                                 <a href="{{ route('creator.dramas.episodes.create', ['drama' => 1]) }}" 
                                    class="flex items-center gap-2.5 px-3 py-2 rounded-xl text-slate-200 hover:bg-white/10 hover:text-white transition-colors">
                                     <i data-lucide="plus-circle" class="w-4 h-4 text-red-400"></i>

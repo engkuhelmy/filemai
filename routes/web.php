@@ -115,12 +115,28 @@ Route::get('/watch/{episode}', function (Episode $episode) {
     ]);
 })->name('watch.direct');
 
-// Creator Studio Episode Management (Protected by auth & creator middleware)
+// Creator Studio Episode & Drama Management (Protected by auth)
 Route::middleware(['auth'])->prefix('creator')->name('creator.')->group(function () {
     
     // Creator Studio Dashboard
     Route::get('/', [CreatorDramaController::class, 'dashboard'])
         ->name('dashboard');
+
+    // Create New Drama Form (Placed before {drama} parameter route)
+    Route::get('/dramas/create', [CreatorDramaController::class, 'create'])
+        ->name('dramas.create');
+
+    // Store New Drama (with optional upfront episode list)
+    Route::post('/dramas', [CreatorDramaController::class, 'store'])
+        ->name('dramas.store');
+
+    // Friendly aliases for drama creation
+    Route::get('/drama/new', function () {
+        return redirect()->route('creator.dramas.create');
+    });
+    Route::get('/drama/create', function () {
+        return redirect()->route('creator.dramas.create');
+    });
 
     // Manage Drama & Episodes List (creator.dramas.manage)
     Route::get('/dramas/{drama}', [CreatorDramaController::class, 'manage'])
@@ -131,13 +147,22 @@ Route::middleware(['auth'])->prefix('creator')->name('creator.')->group(function
         return redirect()->route('creator.dramas.manage', $drama);
     });
 
-    // Form to create YouTube / Storage episode
+    // Form to create YouTube / Storage / Coming Soon episode
     Route::get('/dramas/{drama}/episodes/create', [CreatorEpisodeController::class, 'create'])
         ->name('dramas.episodes.create');
 
     // Store episode
     Route::post('/dramas/{drama}/episodes', [CreatorEpisodeController::class, 'store'])
         ->name('dramas.episodes.store');
+
+    // Edit episode form
+    Route::get('/dramas/{drama}/episodes/{episode}/edit', [CreatorEpisodeController::class, 'edit'])
+        ->name('dramas.episodes.edit');
+
+    // Update episode
+    Route::put('/dramas/{drama}/episodes/{episode}', [CreatorEpisodeController::class, 'update'])
+        ->name('dramas.episodes.update');
+    Route::post('/dramas/{drama}/episodes/{episode}', [CreatorEpisodeController::class, 'update']);
 
     // Delete episode
     Route::delete('/dramas/{drama}/episodes/{episode}', [CreatorEpisodeController::class, 'destroy'])

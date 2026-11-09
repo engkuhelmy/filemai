@@ -47,7 +47,7 @@ class StoreEpisodeRequest extends FormRequest
         $rules = [
             'video_type' => [
                 'required',
-                'in:storage,youtube',
+                'in:storage,youtube,coming_soon',
             ],
             'title' => [
                 'required',
@@ -60,7 +60,7 @@ class StoreEpisodeRequest extends FormRequest
                 'min:1',
                 Rule::unique('episodes', 'episode_number')->where(function ($query) use ($dramaId) {
                     return $query->where('drama_id', $dramaId);
-                }),
+                })->ignore($this->route('episode')?->id),
             ],
             'duration' => [
                 'nullable',
@@ -76,7 +76,7 @@ class StoreEpisodeRequest extends FormRequest
 
         if ($videoType === 'youtube') {
             $rules['youtube_url'] = [
-                'required',
+                'nullable',
                 'string',
                 new ValidYouTubeUrl(),
             ];
@@ -103,7 +103,8 @@ class StoreEpisodeRequest extends FormRequest
     public function withValidator($validator): void
     {
         $validator->after(function ($validator) {
-            if ($this->input('video_type', 'storage') === 'storage') {
+            // If user explicitly chose storage with empty video and neither file nor URL is provided
+            if ($this->input('video_type') === 'storage' && $this->input('media_required')) {
                 $hasFile = $this->hasFile('video_file') && $this->file('video_file')->isValid();
                 $hasUrl = !empty(trim((string)$this->input('video_url', '')));
                 if (!$hasFile && !$hasUrl) {
