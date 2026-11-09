@@ -65,3 +65,4 @@ class CreatorPayout extends Model
         };
     }
 }
+

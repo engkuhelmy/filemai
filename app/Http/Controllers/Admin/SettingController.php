@@ -126,3 +126,4 @@ class SettingController extends Controller
             ->with('success', "Permohonan pengeluaran #PAY-{$payout->id} bernilai RM {$payout->amount} telah dikemaskini kepada '{$newStatus}'!");
     }
 }
+

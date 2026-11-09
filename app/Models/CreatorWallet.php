@@ -165,3 +165,4 @@ class CreatorWallet extends Model
         return 'RM ' . number_format($this->current_balance, 4);
     }
 }
+

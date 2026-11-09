@@ -103,3 +103,4 @@ class WalletController extends Controller
             ->with('success', "Permohonan pengeluaran bernilai RM " . number_format($amount, 2) . " telah berjaya dihantar. Pentadbir akan memproses pindahan dana dalam masa 1-3 hari bekerja.");
     }
 }
+
