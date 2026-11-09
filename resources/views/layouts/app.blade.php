@@ -53,8 +53,12 @@
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js"></script>
 
     <link rel="stylesheet" href="/assets/css/style.css?v=4">
+
+    <style>
+        [x-cloak] { display: none !important; }
+    </style>
 </head>
-<body class="bg-[#0b0c0f] text-[#e5e5e5] min-h-screen flex flex-col font-sans selection:bg-red-600 selection:text-white pb-20 md:pb-0" x-data="{ searchOpen: false, userMenu: false }">
+<body class="bg-[#0b0c0f] text-[#e5e5e5] min-h-screen flex flex-col font-sans selection:bg-red-600 selection:text-white pb-20 md:pb-0" x-data="{ searchOpen: false, mobileUserMenu: false }">
 
     <!-- Flash Toast Notification -->
     @if (session('success') || session('info') || session('error'))
@@ -64,9 +68,9 @@
              x-transition:enter="transition ease-out duration-300"
              x-transition:enter-start="opacity-0 translate-y-[-10px]"
              x-transition:enter-end="opacity-100 translate-y-0"
-             x-transition:exit="transition ease-in duration-200"
-             x-transition:exit-start="opacity-100 translate-y-0"
-             x-transition:exit-end="opacity-0 translate-y-[-10px]"
+             x-transition:leave="transition ease-in duration-200"
+             x-transition:leave-start="opacity-100 translate-y-0"
+             x-transition:leave-end="opacity-0 translate-y-[-10px]"
              class="fixed top-20 right-4 z-50 max-w-sm w-full p-4 rounded-2xl shadow-2xl backdrop-blur-xl border flex items-start gap-3 
              {{ session('success') ? 'bg-emerald-950/90 border-emerald-500/50 text-emerald-200' : (session('error') ? 'bg-red-950/90 border-red-500/50 text-red-200' : 'bg-slate-900/90 border-white/20 text-slate-200') }}">
             <div class="shrink-0 mt-0.5">
@@ -138,26 +142,30 @@
                     @endif
 
                     <!-- User Account Dropdown -->
-                    <div class="relative" @click.away="userMenu = false">
-                        <button @click="userMenu = !userMenu" 
-                                class="flex items-center gap-2 p-1 pl-1.5 pr-2 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 transition-colors focus:outline-none">
+                    <div class="relative" x-data="{ open: false }" @click.outside="open = false" @keydown.escape.window="open = false">
+                        <button type="button" 
+                                @click.stop="open = !open" 
+                                class="flex items-center gap-2 p-1 pl-1.5 pr-2 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 transition-colors focus:outline-none"
+                                :aria-expanded="open.toString()">
                             <img src="{{ auth()->user()->avatar_url ?? 'https://ui-avatars.com/api/?name=' . urlencode(auth()->user()->name) . '&background=E50914&color=fff' }}" 
                                  alt="{{ auth()->user()->name }}" 
                                  class="w-7 h-7 rounded-full object-cover border border-white/20">
                             <span class="hidden md:inline-block text-xs font-bold text-slate-200 max-w-[100px] truncate">
                                 {{ auth()->user()->name }}
                             </span>
-                            <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400"></i>
+                            <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400 transition-transform duration-200" :class="{ 'rotate-180': open }"></i>
                         </button>
 
                         <!-- Dropdown Menu -->
-                        <div x-show="userMenu" 
+                        <div x-show="open" 
+                             x-cloak
                              x-transition:enter="transition ease-out duration-150"
-                             x-transition:enter-start="opacity-0 scale-95"
-                             x-transition:enter-end="opacity-100 scale-100"
-                             x-transition:exit="transition ease-in duration-100"
-                             x-transition:exit-start="opacity-100 scale-100"
-                             x-transition:exit-end="opacity-0 scale-95"
+                             x-transition:enter-start="opacity-0 scale-95 -translate-y-1"
+                             x-transition:enter-end="opacity-100 scale-100 translate-y-0"
+                             x-transition:leave="transition ease-in duration-100"
+                             x-transition:leave-start="opacity-100 scale-100 translate-y-0"
+                             x-transition:leave-end="opacity-0 scale-95 -translate-y-1"
+                             @click="open = false"
                              class="absolute right-0 mt-2 w-56 rounded-2xl bg-[#141414] border border-white/10 shadow-2xl p-2 z-50 text-xs space-y-1">
                             
                             <!-- User Card Header -->
@@ -280,7 +288,7 @@
                     <span>VIP</span>
                 </a>
             @endif
-            <button @click="userMenu = !userMenu" class="flex flex-col items-center gap-1 hover:text-white focus:outline-none">
+            <button type="button" @click.stop="mobileUserMenu = !mobileUserMenu" class="flex flex-col items-center gap-1 hover:text-white focus:outline-none">
                 <img src="{{ auth()->user()->avatar_url ?? 'https://ui-avatars.com/api/?name=' . urlencode(auth()->user()->name) . '&background=E50914&color=fff' }}" 
                      alt="{{ auth()->user()->name }}" 
                      class="w-5 h-5 rounded-full object-cover border border-white/30">
@@ -297,6 +305,109 @@
             </a>
         @endauth
     </nav>
+
+    @auth
+        <!-- Mobile User Bottom Sheet Drawer -->
+        <div x-show="mobileUserMenu" 
+             x-cloak 
+             @keydown.escape.window="mobileUserMenu = false"
+             class="md:hidden fixed inset-0 z-50 flex flex-col justify-end">
+            <!-- Backdrop -->
+            <div x-show="mobileUserMenu" 
+                 x-transition:enter="transition-opacity ease-out duration-200" 
+                 x-transition:enter-start="opacity-0" 
+                 x-transition:enter-end="opacity-100" 
+                 x-transition:leave="transition-opacity ease-in duration-150" 
+                 x-transition:leave-start="opacity-100" 
+                 x-transition:leave-end="opacity-0" 
+                 @click="mobileUserMenu = false" 
+                 class="fixed inset-0 bg-black/75 backdrop-blur-sm"></div>
+
+            <!-- Drawer Content -->
+            <div x-show="mobileUserMenu" 
+                 x-transition:enter="transition ease-out duration-250" 
+                 x-transition:enter-start="translate-y-full" 
+                 x-transition:enter-end="translate-y-0" 
+                 x-transition:leave="transition ease-in duration-200" 
+                 x-transition:leave-start="translate-y-0" 
+                 x-transition:leave-end="translate-y-full" 
+                 @click.outside="mobileUserMenu = false"
+                 class="relative bg-[#141414] border-t border-white/15 rounded-t-3xl p-5 pb-8 space-y-4 shadow-2xl max-h-[85vh] overflow-y-auto z-10">
+                
+                <div class="w-12 h-1 bg-white/20 rounded-full mx-auto mb-1"></div>
+
+                <!-- User Card Header -->
+                <div class="flex items-center justify-between pb-3 border-b border-white/10">
+                    <div class="flex items-center gap-3">
+                        <img src="{{ auth()->user()->avatar_url ?? 'https://ui-avatars.com/api/?name=' . urlencode(auth()->user()->name) . '&background=E50914&color=fff' }}" 
+                             alt="{{ auth()->user()->name }}" 
+                             class="w-10 h-10 rounded-full object-cover border border-white/20">
+                        <div class="min-w-0">
+                            <p class="font-bold text-white text-sm truncate">{{ auth()->user()->name }}</p>
+                            <p class="text-xs text-slate-400 truncate">{{ auth()->user()->email }}</p>
+                        </div>
+                    </div>
+                    <button type="button" @click="mobileUserMenu = false" class="p-2 text-slate-400 hover:text-white text-base">✕</button>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    @if (auth()->user()->isAdmin())
+                        <span class="px-2.5 py-1 rounded text-[10px] font-black bg-purple-500/20 text-purple-300 border border-purple-500/30 uppercase">Super Admin</span>
+                    @elseif (auth()->user()->isCreator())
+                        <span class="px-2.5 py-1 rounded text-[10px] font-black bg-red-500/20 text-red-300 border border-red-500/30 uppercase">Creator</span>
+                    @else
+                        <span class="px-2.5 py-1 rounded text-[10px] font-semibold bg-slate-800 text-slate-300 border border-white/10 uppercase">Penonton</span>
+                    @endif
+
+                    @if (auth()->user()->isPremium())
+                        <span class="px-2.5 py-1 rounded text-[10px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/30 uppercase flex items-center gap-1">
+                            <i data-lucide="crown" class="w-3 h-3 fill-current"></i> VIP
+                        </span>
+                    @endif
+                </div>
+
+                <div class="space-y-1 text-sm pt-1" @click="mobileUserMenu = false">
+                    @if (auth()->user()->isCreator())
+                        <a href="{{ route('creator.dashboard') }}" 
+                           class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-200 hover:bg-white/10 hover:text-white transition-colors">
+                            <i data-lucide="clapperboard" class="w-5 h-5 text-red-500"></i>
+                            <span class="font-semibold">Creator Studio</span>
+                        </a>
+                        <a href="{{ route('creator.dramas.create') }}" 
+                           class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-200 hover:bg-white/10 hover:text-white transition-colors">
+                            <i data-lucide="folder-plus" class="w-5 h-5 text-purple-400"></i>
+                            <span class="font-semibold">Cipta Siri Baharu</span>
+                        </a>
+                        <a href="{{ route('creator.dramas.episodes.create', ['drama' => 1]) }}" 
+                           class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-200 hover:bg-white/10 hover:text-white transition-colors">
+                            <i data-lucide="plus-circle" class="w-5 h-5 text-red-400"></i>
+                            <span class="font-semibold">Upload Episod Baharu</span>
+                        </a>
+                    @endif
+
+                    @if (!auth()->user()->isPremium())
+                        <a href="{{ route('subscribe') }}" 
+                           class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-amber-300 hover:bg-amber-500/10 transition-colors font-semibold">
+                            <i data-lucide="crown" class="w-5 h-5 fill-current"></i>
+                            <span>Langgan Pas VIP (RM5)</span>
+                        </a>
+                    @endif
+
+                    <div class="border-t border-white/10 pt-2">
+                        <form action="{{ route('logout') }}" method="POST">
+                            @csrf
+                            <button type="submit" 
+                                    class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors text-left font-bold">
+                                <i data-lucide="log-out" class="w-5 h-5"></i>
+                                <span>Log Keluar</span>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    @endauth
 
     <!-- Footer -->
     <footer class="border-t border-white/10 bg-[#07080a] py-10 px-4 sm:px-8 text-center text-xs text-slate-500 space-y-3">
