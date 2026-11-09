@@ -63,7 +63,7 @@ Route::get('/', function (Request $request) {
                 'genre' => 'Action',
                 'episodes_count' => 3,
                 'first_episode_id' => 5,
-                'views_count' => 28922,
+                'views_count' => 316,
                 'rating' => '8.9',
                 'hook' => '🔥 #1 Paling Trending di Malaysia',
             ],
@@ -78,7 +78,7 @@ Route::get('/', function (Request $request) {
                 'genre' => 'Romance',
                 'episodes_count' => 4,
                 'first_episode_id' => 1,
-                'views_count' => 15459,
+                'views_count' => 346,
                 'rating' => '8.5',
                 'hook' => '💖 Top 10 Pilihan Peminat Romance',
             ]
@@ -114,6 +114,13 @@ Route::get('/watch/{episode}', function (Episode $episode) {
         'episode' => $episode->episode_number,
     ]);
 })->name('watch.direct');
+
+// Admin Analytics Dashboard (Protected by auth and admin middleware)
+Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
+    Route::get('/', [\App\Http\Controllers\Admin\DashboardController::class, 'index'])
+        ->name('dashboard');
+    Route::get('/dashboard', [\App\Http\Controllers\Admin\DashboardController::class, 'index']);
+});
 
 // Creator Studio Episode & Drama Management (Protected by auth)
 Route::middleware(['auth'])->prefix('creator')->name('creator.')->group(function () {

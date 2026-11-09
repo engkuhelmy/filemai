@@ -120,6 +120,14 @@
                 </button>
 
                 @auth
+                    <!-- Admin Dashboard Button (Only for Super Admin) -->
+                    @if (auth()->user()->isAdmin())
+                        <a href="{{ route('admin.dashboard') }}" class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-600/20 hover:bg-purple-600/30 text-xs font-bold text-purple-300 border border-purple-500/30 transition-colors">
+                            <i data-lucide="layout-dashboard" class="w-4 h-4 text-purple-400"></i>
+                            <span>Admin</span>
+                        </a>
+                    @endif
+
                     <!-- Creator Studio Button (Only for Creator or Admin) -->
                     @if (auth()->user()->isCreator())
                         <a href="{{ route('creator.dramas.episodes.create', ['drama' => 1]) }}" class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-xs font-bold text-white transition-colors border border-white/10">
@@ -188,6 +196,14 @@
                                     @endif
                                 </div>
                             </div>
+
+                            @if (auth()->user()->isAdmin())
+                                <a href="{{ route('admin.dashboard') }}" 
+                                   class="flex items-center gap-2.5 px-3 py-2 rounded-xl text-purple-300 hover:bg-purple-500/15 font-bold transition-colors">
+                                    <i data-lucide="layout-dashboard" class="w-4 h-4 text-purple-400"></i>
+                                    <span>Admin Dashboard</span>
+                                </a>
+                            @endif
 
                             @if (auth()->user()->isCreator())
                                 <a href="{{ route('creator.dashboard') }}" 
@@ -367,6 +383,14 @@
                 </div>
 
                 <div class="space-y-1 text-sm pt-1" @click="mobileUserMenu = false">
+                    @if (auth()->user()->isAdmin())
+                        <a href="{{ route('admin.dashboard') }}" 
+                           class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-purple-300 hover:bg-purple-500/15 font-bold transition-colors">
+                            <i data-lucide="layout-dashboard" class="w-5 h-5 text-purple-400"></i>
+                            <span>Admin Dashboard</span>
+                        </a>
+                    @endif
+
                     @if (auth()->user()->isCreator())
                         <a href="{{ route('creator.dashboard') }}" 
                            class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-200 hover:bg-white/10 hover:text-white transition-colors">

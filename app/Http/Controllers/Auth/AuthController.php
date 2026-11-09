@@ -50,6 +50,11 @@ class AuthController extends Controller
 
             $greeting = 'Selamat kembali, ' . $user->name . '!';
             
+            // If admin, redirect to Admin Dashboard
+            if ($user->isAdmin() && !$request->session()->has('url.intended')) {
+                return redirect()->route('admin.dashboard')->with('success', 'Selamat datang ke Admin Analytics Dashboard, ' . $user->name . '!');
+            }
+
             // If creator and no specific intended URL was set
             if ($user->isCreator() && !$request->session()->has('url.intended')) {
                 return redirect()->route('home')->with('success', $greeting);
@@ -156,8 +161,9 @@ class AuthController extends Controller
         $request->session()->regenerate();
 
         $badge = ucfirst($user->role) . ($user->isPremium() ? ' (VIP)' : '');
+        $target = $user->isAdmin() ? route('admin.dashboard') : route('home');
 
-        return redirect()->intended(route('home'))
+        return redirect()->to($target)
             ->with('success', "Log masuk pantas sebagai {$user->name} [{$badge}].");
     }
 }

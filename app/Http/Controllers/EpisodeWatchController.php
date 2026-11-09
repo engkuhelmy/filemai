@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Drama;
 use App\Models\Episode;
+use App\Models\EpisodeView;
 use App\Models\Ad;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -25,7 +26,10 @@ class EpisodeWatchController extends Controller
             abort(404, 'Episod tidak sah untuk drama ini.');
         }
 
-        // Increment episode view count asynchronously
+        // Record real view event with device, browser, IP and user analytics
+        EpisodeView::recordView($drama, $episode, $request);
+
+        // Increment real views counters
         $episode->increment('views_count');
         $drama->increment('views_count');
 
