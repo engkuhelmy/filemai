@@ -248,6 +248,7 @@
                                 <input type="file" 
                                        name="poster_file" 
                                        accept="image/*" 
+                                       :disabled="posterMode !== 'file'"
                                        @change="previewImage($event, 'poster')"
                                        class="w-full text-xs text-slate-400 file:mr-3 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-[#E50914]/20 file:text-red-400 hover:file:bg-[#E50914]/30 cursor-pointer bg-slate-950 p-2 rounded-2xl border border-white/10">
                             </div>
@@ -257,6 +258,7 @@
                                 <input type="url" 
                                        name="poster_url" 
                                        value="{{ old('poster_url') }}" 
+                                       :disabled="posterMode !== 'url'"
                                        @input="posterPreview = $event.target.value"
                                        placeholder="https://.../poster.jpg" 
                                        class="w-full bg-slate-950 text-white text-xs px-3.5 py-3 rounded-2xl border border-white/10 focus:outline-none focus:border-[#E50914]">
@@ -304,6 +306,7 @@
                                 <input type="file" 
                                        name="banner_file" 
                                        accept="image/*" 
+                                       :disabled="bannerMode !== 'file'"
                                        @change="previewImage($event, 'banner')"
                                        class="w-full text-xs text-slate-400 file:mr-3 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-white/10 file:text-slate-300 hover:file:bg-white/20 cursor-pointer bg-slate-950 p-2 rounded-2xl border border-white/10">
                             </div>
@@ -312,6 +315,7 @@
                                 <input type="url" 
                                        name="banner_url" 
                                        value="{{ old('banner_url') }}" 
+                                       :disabled="bannerMode !== 'url'"
                                        @input="bannerPreview = $event.target.value"
                                        placeholder="https://.../banner.jpg" 
                                        class="w-full bg-slate-950 text-white text-xs px-3.5 py-3 rounded-2xl border border-white/10 focus:outline-none focus:border-[#E50914]">

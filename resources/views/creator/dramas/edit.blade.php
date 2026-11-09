@@ -7,8 +7,10 @@
      x-data="{
         posterMode: 'file',
         posterPreview: '{{ $drama->poster_url }}',
+        posterUrl: '{{ str_starts_with($drama->poster_url, "http") ? $drama->poster_url : "" }}',
         bannerMode: 'file',
         bannerPreview: '{{ $drama->banner_url ?? $drama->poster_url }}',
+        bannerUrl: '{{ str_starts_with($drama->banner_url ?? "", "http") ? $drama->banner_url : "" }}',
         canEditIdentity: {{ $canEditIdentity ? 'true' : 'false' }},
 
         previewImage(event, target) {
@@ -16,8 +18,14 @@
             if (file) {
                 const reader = new FileReader();
                 reader.onload = (e) => {
-                    if (target === 'poster') this.posterPreview = e.target.result;
-                    if (target === 'banner') this.bannerPreview = e.target.result;
+                    if (target === 'poster') {
+                        this.posterPreview = e.target.result;
+                        this.posterUrl = '';
+                    }
+                    if (target === 'banner') {
+                        this.bannerPreview = e.target.result;
+                        this.bannerUrl = '';
+                    }
                 };
                 reader.readAsDataURL(file);
             }
@@ -215,6 +223,7 @@
                                 <input type="file" 
                                        name="poster_file" 
                                        accept="image/jpeg,image/png,image/webp" 
+                                       :disabled="posterMode !== 'file'"
                                        @change="previewImage($event, 'poster')" 
                                        class="w-full text-xs text-slate-300 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-white/10 file:text-white hover:file:bg-white/20 cursor-pointer bg-slate-950 p-2 rounded-2xl border border-white/10">
                             </div>
@@ -223,7 +232,9 @@
                                 <label class="block text-xs font-semibold text-slate-400">Masukkan pautan URL poster:</label>
                                 <input type="url" 
                                        name="poster_url" 
-                                       x-model="posterPreview" 
+                                       x-model="posterUrl" 
+                                       :disabled="posterMode !== 'url'"
+                                       @input="posterPreview = posterUrl" 
                                        placeholder="https://domain.com/poster.jpg" 
                                        class="w-full bg-slate-950 text-white text-xs px-4 py-3 rounded-2xl border border-white/10 focus:outline-none focus:border-red-500">
                             </div>
@@ -241,6 +252,88 @@
                                     Poster rasmi siri drama ini telah dikunci mengikut peraturan 24 jam. Jika anda memerlukan pertukaran poster rasmi atas sebab hak cipta atau isu teknikal mendesak, sila hubungi pentadbir Filemai melalui saluran sokongan rasmi.
                                 </p>
                             </div>
+                        @endif
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION 2.5: Banner Melintang Hero / Billboard (16:9) -->
+            <div class="space-y-4 pt-4 border-t border-white/10">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-sm font-bold text-white flex items-center gap-2">
+                        <i data-lucide="layout" class="w-4 h-4 text-amber-500"></i>
+                        <span>2b. Banner Billboard / Hero Siri (Nisbah 16:9 - Opsional)</span>
+                    </h2>
+                    @if ($canEditIdentity)
+                        <span class="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                            <i data-lucide="check" class="w-3 h-3"></i> Boleh Diubah
+                        </span>
+                    @else
+                        <span class="text-[10px] font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                            <i data-lucide="lock" class="w-3 h-3"></i> Banner Dikunci
+                        </span>
+                    @endif
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+                    <!-- Preview Card -->
+                    <div class="w-full max-w-[280px] mx-auto md:mx-0 aspect-[16/9] rounded-2xl overflow-hidden bg-slate-950 border border-white/10 relative shadow-xl">
+                        <template x-if="bannerPreview">
+                            <img :src="bannerPreview" alt="Banner Preview" class="w-full h-full object-cover">
+                        </template>
+                        @if (!$canEditIdentity)
+                            <div class="absolute inset-0 bg-black/60 backdrop-blur-[2px] flex flex-col items-center justify-center p-3 text-center gap-1">
+                                <div class="w-8 h-8 rounded-full bg-amber-500/20 text-amber-300 flex items-center justify-center">
+                                    <i data-lucide="lock" class="w-4 h-4"></i>
+                                </div>
+                                <span class="text-[10px] font-black uppercase text-amber-300">Banner Dikunci</span>
+                                <span class="text-[9px] text-slate-300">Melebihi 24 jam</span>
+                            </div>
+                        @endif
+                    </div>
+
+                    <!-- Upload Controls -->
+                    <div class="md:col-span-2 space-y-4">
+                        @if ($canEditIdentity)
+                            <div class="flex items-center gap-2 text-xs">
+                                <button type="button" 
+                                        @click="bannerMode = 'file'" 
+                                        :class="bannerMode === 'file' ? 'bg-red-600 text-white font-bold' : 'bg-slate-950 text-slate-400 border border-white/10'" 
+                                        class="px-3.5 py-1.5 rounded-xl transition-all">
+                                    Muat Naik Fail Banner Baharu
+                                </button>
+                                <button type="button" 
+                                        @click="bannerMode = 'url'" 
+                                        :class="bannerMode === 'url' ? 'bg-red-600 text-white font-bold' : 'bg-slate-950 text-slate-400 border border-white/10'" 
+                                        class="px-3.5 py-1.5 rounded-xl transition-all">
+                                    Pautan URL Banner
+                                </button>
+                            </div>
+
+                            <div x-show="bannerMode === 'file'" class="space-y-2">
+                                <label class="block text-xs font-semibold text-slate-400">Pilih fail banner (JPG, PNG, WebP - Maks 5MB):</label>
+                                <input type="file" 
+                                       name="banner_file" 
+                                       accept="image/jpeg,image/png,image/webp" 
+                                       :disabled="bannerMode !== 'file'"
+                                       @change="previewImage($event, 'banner')" 
+                                       class="w-full text-xs text-slate-300 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-white/10 file:text-white hover:file:bg-white/20 cursor-pointer bg-slate-950 p-2 rounded-2xl border border-white/10">
+                            </div>
+
+                            <div x-show="bannerMode === 'url'" class="space-y-2">
+                                <label class="block text-xs font-semibold text-slate-400">Masukkan pautan URL banner:</label>
+                                <input type="url" 
+                                       name="banner_url" 
+                                       x-model="bannerUrl" 
+                                       :disabled="bannerMode !== 'url'"
+                                       @input="bannerPreview = bannerUrl" 
+                                       placeholder="https://domain.com/banner.jpg" 
+                                       class="w-full bg-slate-950 text-white text-xs px-4 py-3 rounded-2xl border border-white/10 focus:outline-none focus:border-red-500">
+                            </div>
+
+                            <p class="text-[11px] text-slate-500 leading-relaxed">
+                                Banner latar belakang nisbah 16:9 untuk paparan hero desktop, skrin lebar & smart TV.
+                            </p>
                         @endif
                     </div>
                 </div>

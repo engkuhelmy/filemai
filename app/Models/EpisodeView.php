@@ -114,3 +114,4 @@ class EpisodeView extends Model
         return $view;
     }
 }
+

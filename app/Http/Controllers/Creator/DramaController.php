@@ -56,6 +56,9 @@ class DramaController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
+        $this->processImageInput($request, 'poster_file', 'poster_url', 'poster');
+        $this->processImageInput($request, 'banner_file', 'banner_url', 'banner');
+
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'genre' => 'required|string|max:100',
@@ -269,6 +272,9 @@ class DramaController extends Controller
         ];
 
         if ($canEditIdentity) {
+            $this->processImageInput($request, 'poster_file', 'poster_url', 'poster');
+            $this->processImageInput($request, 'banner_file', 'banner_url', 'banner');
+
             $rules['title'] = 'required|string|max:255';
             $rules['poster_file'] = 'nullable|file|mimes:jpeg,png,jpg,webp|max:5120';
             $rules['poster_url'] = 'nullable|string|max:500';
@@ -357,5 +363,44 @@ class DramaController extends Controller
         return redirect()
             ->route('creator.dramas.manage', $drama)
             ->with('success', "Maklumat siri drama '{$drama->title}' berjaya dikemaskini!");
+    }
+
+    /**
+     * Sanitize and process image inputs:
+     * - If an image file is uploaded, clear any URL input so it doesn't conflict or fail validation.
+     * - If a base64 data URI (data:image/...) is submitted in the URL field, automatically decode and save it as an image file.
+     */
+    private function processImageInput(Request $request, string $fileKey, string $urlKey, string $prefix): void
+    {
+        if ($request->hasFile($fileKey) && $request->file($fileKey)->isValid()) {
+            $request->merge([$urlKey => null]);
+            return;
+        }
+
+        $urlValue = $request->input($urlKey);
+        if (!empty($urlValue) && is_string($urlValue) && str_starts_with($urlValue, 'data:image/')) {
+            if (preg_match('/^data:image\/(\w+);base64,/', $urlValue, $matches)) {
+                $ext = strtolower($matches[1]);
+                if ($ext === 'jpeg') {
+                    $ext = 'jpg';
+                }
+                if (!in_array($ext, ['jpg', 'png', 'webp'])) {
+                    $ext = 'jpg';
+                }
+                $data = substr($urlValue, strpos($urlValue, ',') + 1);
+                $decoded = base64_decode($data);
+                if ($decoded !== false) {
+                    $filename = $prefix . '_' . time() . '_' . Str::random(6) . '.' . $ext;
+                    $destDir = public_path('uploads/posters');
+                    if (!file_exists($destDir)) {
+                        @mkdir($destDir, 0775, true);
+                    }
+                    file_put_contents($destDir . '/' . $filename, $decoded);
+                    $request->merge([$urlKey => '/uploads/posters/' . $filename]);
+                    return;
+                }
+            }
+            $request->merge([$urlKey => null]);
+        }
     }
 }
