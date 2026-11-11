@@ -6,6 +6,7 @@
 <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8" x-data="{
     title: '{{ addslashes(old('title', $drama->title)) }}',
     slug: '{{ addslashes(old('slug', $drama->slug)) }}',
+    synopsis: '{{ addslashes(old('synopsis', $drama->synopsis ?? '')) }}',
     accentColor: '{{ old('accent_color', $drama->effective_accent_color) }}',
     contentFormat: '{{ old('type', $drama->effective_type ?? 'drama') }}',
     releaseStatus: '{{ old('release_status', $drama->release_status ?? 'ongoing') }}',
@@ -15,6 +16,66 @@
     posterPreview: '{{ $drama->poster_url }}',
     bannerPreview: '{{ $drama->banner_url }}',
     isBundleEnabled: {{ old('is_bundle_enabled', $drama->is_bundle_enabled) ? 'true' : 'false' }},
+
+    // Data Extraction states
+    isExtracting: false,
+    toastMessage: '',
+    toastType: '',
+    toastTimeout: null,
+
+    showToast(message, type = 'success') {
+        this.toastMessage = message;
+        this.toastType = type;
+        if (this.toastTimeout) clearTimeout(this.toastTimeout);
+        this.toastTimeout = setTimeout(() => {
+            this.toastMessage = '';
+        }, 5000);
+    },
+
+    async extractTrailerData() {
+        const url = this.trailerUrl.trim();
+        if (!url) {
+            this.showToast('Sila masukkan pautan URL YouTube trailer terlebih dahulu.', 'error');
+            return;
+        }
+
+        this.isExtracting = true;
+        this.parseTrailer();
+
+        try {
+            const response = await fetch('{{ route('creator.youtube.extract') }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                },
+                body: JSON.stringify({ url: url })
+            });
+
+            const result = await response.json();
+
+            if (response.ok && result.success) {
+                if (result.title) {
+                    this.title = result.title;
+                    if (!this.slug) {
+                        this.slug = result.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+                    }
+                }
+                if (result.description) {
+                    this.synopsis = result.description;
+                }
+                this.parseTrailer();
+                this.showToast('Data trailer video berjaya diekstrak & diisi secara automatik!', 'success');
+            } else {
+                this.showToast(result.message || 'Gagal memuat turun data video. Pastikan pautan sah dan video adalah Public/Unlisted.', 'error');
+            }
+        } catch (error) {
+            this.showToast('Gagal memuat turun data video. Pastikan pautan sah dan video adalah Public/Unlisted.', 'error');
+        } finally {
+            this.isExtracting = false;
+        }
+    },
 
     setAccent(color) {
         this.accentColor = color;
@@ -55,6 +116,32 @@
         }
     }
 }">
+
+    <!-- Toast Notification Banner -->
+    <div x-show="toastMessage" 
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0 -translate-y-2"
+         x-transition:enter-end="opacity-100 translate-y-0"
+         x-transition:leave="transition ease-in duration-200"
+         x-transition:leave-start="opacity-100 translate-y-0"
+         x-transition:leave-end="opacity-0 -translate-y-2"
+         class="fixed top-20 right-4 sm:right-8 z-50 max-w-md p-4 rounded-2xl border shadow-2xl flex items-start gap-3 backdrop-blur-xl"
+         :class="toastType === 'success' ? 'bg-emerald-950/95 border-emerald-500/60 text-emerald-200 shadow-emerald-950/50' : 'bg-red-950/95 border-red-500/60 text-red-200 shadow-red-950/50'"
+         style="display: none;">
+        <div class="mt-0.5 shrink-0">
+            <template x-if="toastType === 'success'">
+                <i data-lucide="check-circle" class="w-5 h-5 text-emerald-400"></i>
+            </template>
+            <template x-if="toastType === 'error'">
+                <i data-lucide="alert-triangle" class="w-5 h-5 text-red-400"></i>
+            </template>
+        </div>
+        <div class="flex-1 text-xs">
+            <span class="font-bold block" x-text="toastType === 'success' ? 'Ekstrak Berjaya! ✨' : 'Ralat Ekstrak Video ⚠️'"></span>
+            <p class="text-[11px] mt-0.5" x-text="toastMessage"></p>
+        </div>
+        <button type="button" @click="toastMessage = ''" class="text-slate-400 hover:text-white text-xs p-1">✕</button>
+    </div>
 
     <!-- Breadcrumb -->
     <div class="flex items-center gap-2 text-xs text-slate-400 mb-6">
@@ -364,19 +451,54 @@
                         <span class="text-[10px] text-slate-400">Meningkatkan Kadar Pembelian Episod</span>
                     </div>
 
-                    <div class="relative">
+                    <div class="relative flex items-center">
                         <input type="text" 
                                id="trailer_url" 
                                name="trailer_url" 
                                x-model="trailerUrl" 
                                @input="parseTrailer" 
+                               @keydown.enter.prevent="extractTrailerData()"
                                value="{{ old('trailer_url', $drama->trailer_url) }}" 
                                placeholder="https://www.youtube.com/watch?v=... atau pautan MP4 trailer" 
-                               class="w-full bg-slate-950 text-white text-xs px-4 py-3 rounded-2xl border border-white/10 focus:outline-none focus:border-amber-500">
+                               class="w-full bg-slate-950 text-white text-xs pl-4 pr-36 py-3 rounded-2xl border border-white/10 focus:outline-none focus:border-amber-500">
+                        
+                        <!-- Auto-Extract Button -->
+                        <button type="button" 
+                                @click="extractTrailerData()" 
+                                :disabled="isExtracting || !trailerUrl.trim()" 
+                                class="absolute right-1.5 top-1.5 bottom-1.5 px-3.5 rounded-xl bg-gradient-to-r from-red-600 via-pink-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white text-xs font-black flex items-center gap-1.5 transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-lg">
+                            <template x-if="!isExtracting">
+                                <span class="flex items-center gap-1.5">
+                                    <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+                                    <span>Ambil Data</span>
+                                </span>
+                            </template>
+                            <template x-if="isExtracting">
+                                <span class="flex items-center gap-1.5">
+                                    <svg class="animate-spin w-3.5 h-3.5 text-white" viewBox="0 0 24 24" fill="none">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                                    </svg>
+                                    <span class="text-[11px]">Memuat...</span>
+                                </span>
+                            </template>
+                        </button>
+                    </div>
+
+                    <!-- Extraction Loading Banner -->
+                    <div x-show="isExtracting" x-transition class="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-3 shadow-lg" style="display: none;">
+                        <svg class="animate-spin w-5 h-5 text-amber-400 shrink-0" viewBox="0 0 24 24" fill="none">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                        </svg>
+                        <div class="text-[11px]">
+                            <strong class="block text-amber-200 font-bold">Sedang mengekstrak data video YouTube (*Data Extraction*)...</strong>
+                            <span class="text-slate-300">Mengambil tajuk drama, deskripsi sinopsis, dan gambar resolusi tinggi (*maxres*).</span>
+                        </div>
                     </div>
 
                     <div x-show="trailerYoutubeId" class="pt-2 flex items-center gap-3" style="display: none;">
-                        <div class="w-28 aspect-video rounded-lg overflow-hidden border border-white/10">
+                        <div class="w-28 aspect-video rounded-lg overflow-hidden border border-white/10 shadow-lg">
                             <img :src="`https://img.youtube.com/vi/${trailerYoutubeId}/hqdefault.jpg`" class="w-full h-full object-cover">
                         </div>
                         <span class="text-xs text-emerald-400 font-semibold">✓ Trailer YouTube sah disahkan!</span>
@@ -399,6 +521,7 @@
                     </label>
                     <textarea id="synopsis" 
                               name="synopsis" 
+                              x-model="synopsis"
                               rows="5" 
                               placeholder="Ceritakan ringkasan kisah dramatik, konflik utama, dan tarikan siri drama anda..." 
                               class="w-full bg-slate-950 text-white text-sm p-4 rounded-2xl border border-white/10 focus:outline-none focus:border-red-500 leading-relaxed">{{ old('synopsis', $drama->synopsis) }}</textarea>

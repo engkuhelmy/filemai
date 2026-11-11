@@ -11,7 +11,84 @@
     selectedFileName: '',
     selectedThumbName: '',
     thumbPreviewUrl: null,
+    autoThumbnailUrl: '{{ old('thumbnail_url', '') }}',
     statusChoice: '{{ old('status', 'published') }}',
+    title: '{{ addslashes(old('title', 'Episod ' . $nextEpNumber)) }}',
+    description: '{{ addslashes(old('description', '')) }}',
+    duration: {{ (int)old('duration', 60) }},
+
+    // Data Extraction & Auto-Fill states
+    isExtracting: false,
+    toastMessage: '',
+    toastType: '',
+    toastTimeout: null,
+
+    showToast(message, type = 'success') {
+        this.toastMessage = message;
+        this.toastType = type;
+        if (this.toastTimeout) clearTimeout(this.toastTimeout);
+        this.toastTimeout = setTimeout(() => {
+            this.toastMessage = '';
+        }, 5000);
+    },
+
+    async extractData() {
+        const url = this.youtubeUrl.trim();
+        if (!url) {
+            this.showToast('Sila masukkan pautan URL YouTube terlebih dahulu.', 'error');
+            return;
+        }
+
+        this.isExtracting = true;
+        this.parseYoutube();
+
+        try {
+            const response = await fetch('{{ route('creator.youtube.extract') }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                },
+                body: JSON.stringify({ url: url })
+            });
+
+            const result = await response.json();
+
+            if (response.ok && result.success) {
+                // Auto-fill Title
+                if (result.title) {
+                    this.title = result.title;
+                }
+
+                // Auto-fill Description
+                if (result.description) {
+                    this.description = result.description;
+                }
+
+                // Auto-fill Duration (converted into total seconds)
+                if (result.duration_seconds) {
+                    this.duration = result.duration_seconds;
+                }
+
+                // Auto-fill Thumbnail (Highest quality available: maxresdefault / hqdefault)
+                if (result.thumbnail_url) {
+                    this.thumbPreviewUrl = result.thumbnail_url;
+                    this.autoThumbnailUrl = result.thumbnail_url;
+                    this.selectedThumbName = 'YouTube High-Res (' + (result.thumbnail_quality || 'maxres') + ')';
+                }
+
+                this.parseYoutube();
+                this.showToast('Data video berjaya diekstrak & diisi secara automatik!', 'success');
+            } else {
+                this.showToast(result.message || 'Gagal memuat turun data video. Pastikan pautan sah dan video adalah Public/Unlisted.', 'error');
+            }
+        } catch (error) {
+            this.showToast('Gagal memuat turun data video. Pastikan pautan sah dan video adalah Public/Unlisted.', 'error');
+        } finally {
+            this.isExtracting = false;
+        }
+    },
 
     parseYoutube() {
         const url = this.youtubeUrl.trim();
@@ -49,7 +126,10 @@
         if (file) {
             this.selectedThumbName = file.name;
             const reader = new FileReader();
-            reader.onload = (e) => { this.thumbPreviewUrl = e.target.result; };
+            reader.onload = (e) => { 
+                this.thumbPreviewUrl = e.target.result;
+                this.autoThumbnailUrl = '';
+            };
             reader.readAsDataURL(file);
         } else {
             this.selectedThumbName = '';
@@ -63,6 +143,32 @@
         }
     }
 }">
+
+    <!-- Toast Notification Banner -->
+    <div x-show="toastMessage" 
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0 -translate-y-2"
+         x-transition:enter-end="opacity-100 translate-y-0"
+         x-transition:leave="transition ease-in duration-200"
+         x-transition:leave-start="opacity-100 translate-y-0"
+         x-transition:leave-end="opacity-0 -translate-y-2"
+         class="fixed top-20 right-4 sm:right-8 z-50 max-w-md p-4 rounded-2xl border shadow-2xl flex items-start gap-3 backdrop-blur-xl"
+         :class="toastType === 'success' ? 'bg-emerald-950/95 border-emerald-500/60 text-emerald-200 shadow-emerald-950/50' : 'bg-red-950/95 border-red-500/60 text-red-200 shadow-red-950/50'"
+         style="display: none;">
+        <div class="mt-0.5 shrink-0">
+            <template x-if="toastType === 'success'">
+                <i data-lucide="check-circle" class="w-5 h-5 text-emerald-400"></i>
+            </template>
+            <template x-if="toastType === 'error'">
+                <i data-lucide="alert-triangle" class="w-5 h-5 text-red-400"></i>
+            </template>
+        </div>
+        <div class="flex-1 text-xs">
+            <span class="font-bold block" x-text="toastType === 'success' ? 'Ekstrak Berjaya! ✨' : 'Ralat Ekstrak Video ⚠️'"></span>
+            <p class="text-[11px] mt-0.5" x-text="toastMessage"></p>
+        </div>
+        <button type="button" @click="toastMessage = ''" class="text-slate-400 hover:text-white text-xs p-1">✕</button>
+    </div>
 
     <!-- Breadcrumb -->
     <div class="flex items-center gap-2 text-xs text-slate-400 mb-6">
@@ -185,6 +291,7 @@
                     <input type="text" 
                            id="title" 
                            name="title" 
+                           x-model="title"
                            value="{{ old('title', 'Episod ' . $nextEpNumber) }}" 
                            placeholder="Contoh: Episod 1: Pertemuan Tak Diduga" 
                            required
@@ -203,6 +310,7 @@
                 </label>
                 <textarea id="description" 
                           name="description" 
+                          x-model="description"
                           rows="3" 
                           placeholder="Masukkan ringkasan jalan cerita episod ini, nota penting untuk penonton, atau kata kunci carian..."
                           class="w-full bg-slate-950 text-white text-sm px-4 py-3 rounded-2xl border @error('description') border-red-500 @else border-white/10 @enderror focus:outline-none focus:border-red-500 transition-colors">{{ old('description') }}</textarea>
@@ -219,8 +327,8 @@
                         <span class="text-[11px] text-slate-400 font-normal">Menyokong Format: Watch, Shorts, Embed, youtu.be</span>
                     </label>
                     
-                    <div class="relative">
-                        <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-red-500">
+                    <div class="relative flex items-center">
+                        <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-red-500 z-10">
                             <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
                         </div>
                         <input type="text" 
@@ -228,13 +336,48 @@
                                name="youtube_url" 
                                x-model="youtubeUrl"
                                @input="parseYoutube"
+                               @keydown.enter.prevent="extractData()"
                                value="{{ old('youtube_url', '') }}"
                                placeholder="https://www.youtube.com/watch?v=dQw4w9WgXcQ atau https://youtu.be/..." 
-                               class="w-full bg-slate-950 text-white text-sm pl-11 pr-4 py-3 rounded-2xl border @error('youtube_url') border-red-500 bg-red-950/20 @else border-white/10 @enderror focus:outline-none focus:border-red-500 transition-colors">
+                               class="w-full bg-slate-950 text-white text-sm pl-11 pr-36 py-3 rounded-2xl border @error('youtube_url') border-red-500 bg-red-950/20 @else border-white/10 @enderror focus:outline-none focus:border-red-500 transition-colors">
+                        
+                        <!-- Auto-Extract Button -->
+                        <button type="button" 
+                                @click="extractData()" 
+                                :disabled="isExtracting || !youtubeUrl.trim()" 
+                                class="absolute right-1.5 top-1.5 bottom-1.5 px-3.5 rounded-xl bg-gradient-to-r from-red-600 via-pink-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white text-xs font-black flex items-center gap-1.5 transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-lg">
+                            <template x-if="!isExtracting">
+                                <span class="flex items-center gap-1.5">
+                                    <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+                                    <span>Ambil Data</span>
+                                </span>
+                            </template>
+                            <template x-if="isExtracting">
+                                <span class="flex items-center gap-1.5">
+                                    <svg class="animate-spin w-3.5 h-3.5 text-white" viewBox="0 0 24 24" fill="none">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                                    </svg>
+                                    <span class="text-[11px]">Memuat...</span>
+                                </span>
+                            </template>
+                        </button>
                     </div>
                     @error('youtube_url')
                         <p class="text-xs text-red-400 font-medium mt-1">{{ $message }}</p>
                     @enderror
+                </div>
+
+                <!-- Extraction Loading Banner -->
+                <div x-show="isExtracting" x-transition class="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-3 shadow-lg" style="display: none;">
+                    <svg class="animate-spin w-5 h-5 text-amber-400 shrink-0" viewBox="0 0 24 24" fill="none">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                    </svg>
+                    <div class="text-[11px]">
+                        <strong class="block text-amber-200 font-bold">Sedang mengekstrak data video YouTube (*Data Extraction*)...</strong>
+                        <span class="text-slate-300">Mengambil tajuk rasmi, deskripsi sinopsis, durasi video (saat), dan gambar kenit resolusi tertinggi (*maxres*).</span>
+                    </div>
                 </div>
 
                 <!-- Instant YouTube Preview -->
@@ -320,18 +463,31 @@
 
             <!-- 5. Gambar Kenit Tersuai (Custom Thumbnail - Feature 4) -->
             <div class="rounded-2xl bg-black/40 border border-white/10 p-5 space-y-4">
+                <input type="hidden" name="thumbnail_url" x-model="autoThumbnailUrl">
                 <div class="border-b border-white/5 pb-3">
-                    <div class="text-xs font-bold text-white flex items-center gap-1.5">
-                        <i data-lucide="image" class="w-4 h-4 text-amber-400"></i>
-                        Muat Naik Gambar Kenit Tersuai (Custom Thumbnail)
+                    <div class="text-xs font-bold text-white flex items-center justify-between">
+                        <div class="flex items-center gap-1.5">
+                            <i data-lucide="image" class="w-4 h-4 text-amber-400"></i>
+                            <span>Muat Naik Gambar Kenit Tersuai (Custom Thumbnail)</span>
+                        </div>
+                        <template x-if="autoThumbnailUrl">
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                                ✓ Auto-Extracted YouTube HD
+                            </span>
+                        </template>
                     </div>
-                    <p class="text-[11px] text-slate-400">Jika tidak dimuat naik, sistem akan auto-jana gambar kenit daripada YouTube atau poster siri.</p>
+                    <p class="text-[11px] text-slate-400">Jika tidak dimuat naik, sistem akan menggunakan gambar kenit berkualiti tinggi daripada YouTube atau poster siri.</p>
                 </div>
 
                 <div class="flex flex-col sm:flex-row items-start sm:items-center gap-5">
                     <div class="relative w-36 sm:w-44 aspect-video rounded-2xl overflow-hidden bg-slate-800 border border-white/10 shrink-0 shadow-xl flex items-center justify-center">
                         <template x-if="thumbPreviewUrl">
-                            <img :src="thumbPreviewUrl" alt="Thumbnail Preview" class="w-full h-full object-cover">
+                            <div class="relative w-full h-full">
+                                <img :src="thumbPreviewUrl" alt="Thumbnail Preview" class="w-full h-full object-cover">
+                                <template x-if="autoThumbnailUrl">
+                                    <span class="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded bg-black/80 text-[9px] font-mono text-amber-300 border border-amber-500/40">HD</span>
+                                </template>
+                            </div>
                         </template>
                         <template x-if="!thumbPreviewUrl">
                             <div class="text-center p-3 text-slate-500">
@@ -344,7 +500,7 @@
                     <div class="flex-1 space-y-2">
                         <label class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-xs font-bold text-white cursor-pointer border border-white/10 transition-colors">
                             <i data-lucide="upload" class="w-4 h-4 text-amber-400"></i>
-                            <span>Pilih Gambar Kenit (JPG / PNG / WebP)</span>
+                            <span>Pilih Gambar Kenit Pengganti (JPG / PNG / WebP)</span>
                             <input type="file" 
                                    id="thumbnail_file" 
                                    name="thumbnail_file" 
@@ -428,6 +584,7 @@
                     <input type="number" 
                            id="duration" 
                            name="duration" 
+                           x-model="duration"
                            value="{{ old('duration', 60) }}" 
                            min="5" 
                            max="3600"

@@ -2,6 +2,10 @@
 
 namespace App\Services;
 
+use Illuminate\Support\Facades\Http;
+use DateInterval;
+use Throwable;
+
 class YouTubeService
 {
     /**
@@ -84,5 +88,151 @@ class YouTubeService
 
         $merged = array_merge($defaultParams, $params);
         return "https://www.youtube.com/embed/{$videoId}?" . http_build_query($merged);
+    }
+
+    /**
+     * Data Extraction & Auto-Fill from YouTube:
+     * - Highest quality thumbnail (maxresdefault or hqdefault)
+     * - Video Title
+     * - Video Description / Synopsis
+     * - Video Duration in total seconds (converted from ISO 8601 or approxDurationMs)
+     */
+    public static function extractVideoData(string $url): array
+    {
+        $videoId = self::extractVideoId($url);
+        if (!$videoId) {
+            return [
+                'success' => false,
+                'message' => 'Pautan URL YouTube tidak sah. Sila semak pautan anda.',
+            ];
+        }
+
+        $title = '';
+        $description = '';
+        $durationSeconds = 60;
+        $durationIso = 'PT1M0S';
+        $fetched = false;
+
+        // 1. Try YouTube Data API v3 if API key is configured
+        $apiKey = config('services.youtube.api_key') ?: env('YOUTUBE_API_KEY');
+        if (!empty($apiKey)) {
+            try {
+                $apiRes = Http::timeout(5)->get('https://www.googleapis.com/youtube/v3/videos', [
+                    'part' => 'snippet,contentDetails',
+                    'id' => $videoId,
+                    'key' => $apiKey,
+                ]);
+
+                if ($apiRes->successful() && !empty($apiRes->json('items'))) {
+                    $item = $apiRes->json('items')[0];
+                    $title = $item['snippet']['title'] ?? '';
+                    $description = $item['snippet']['description'] ?? '';
+                    if (!empty($item['contentDetails']['duration'])) {
+                        $durationIso = $item['contentDetails']['duration'];
+                        $durationSeconds = self::parseIso8601Duration($durationIso);
+                    }
+                    $fetched = true;
+                }
+            } catch (Throwable $e) {
+                // Graceful fallback to oEmbed + scraper
+            }
+        }
+
+        // 2. Fallback to YouTube oEmbed + Page Scraper (No API key required)
+        if (!$fetched) {
+            try {
+                $oembedUrl = 'https://www.youtube.com/oembed?url=' . urlencode("https://www.youtube.com/watch?v={$videoId}") . '&format=json';
+                $oembedRes = Http::timeout(5)->get($oembedUrl);
+
+                if ($oembedRes->successful()) {
+                    $oembed = $oembedRes->json();
+                    $title = $oembed['title'] ?? '';
+                    $fetched = true;
+                }
+            } catch (Throwable $e) {
+                // Continues
+            }
+
+            try {
+                $pageRes = Http::withHeaders([
+                    'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Accept-Language' => 'ms,en-US;q=0.9,en;q=0.8',
+                ])->timeout(6)->get("https://www.youtube.com/watch?v={$videoId}");
+
+                if ($pageRes->successful()) {
+                    $html = $pageRes->body();
+
+                    if (empty($title) && preg_match('/<meta property="og:title" content="([^"]+)"/i', $html, $m)) {
+                        $title = html_entity_decode($m[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                        $fetched = true;
+                    }
+
+                    if (preg_match('/<meta property="og:description" content="([^"]*)"/i', $html, $m)) {
+                        $description = html_entity_decode($m[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                    }
+
+                    if (preg_match('/"approxDurationMs":"(\d+)"/', $html, $m)) {
+                        $durationSeconds = (int)round(((int)$m[1]) / 1000);
+                    } elseif (preg_match('/<meta itemprop="duration" content="([^"]+)"/i', $html, $m)) {
+                        $durationIso = $m[1];
+                        $durationSeconds = self::parseIso8601Duration($durationIso);
+                    }
+                }
+            } catch (Throwable $e) {
+                // Continues
+            }
+        }
+
+        if (!$fetched || empty($title)) {
+            return [
+                'success' => false,
+                'message' => 'Gagal memuat turun data video. Pastikan pautan sah dan video adalah Public/Unlisted.',
+            ];
+        }
+
+        // 3. Highest Quality Thumbnail Resolution Check
+        $maxresUrl = "https://img.youtube.com/vi/{$videoId}/maxresdefault.jpg";
+        $thumbUrl = "https://img.youtube.com/vi/{$videoId}/hqdefault.jpg";
+        $thumbQuality = 'hqdefault';
+
+        try {
+            $maxresRes = Http::timeout(4)->get($maxresUrl);
+            if ($maxresRes->successful() && strlen($maxresRes->body()) > 4000) {
+                $thumbUrl = $maxresUrl;
+                $thumbQuality = 'maxresdefault';
+            }
+        } catch (Throwable $e) {
+            // Keep hqdefault fallback
+        }
+
+        return [
+            'success' => true,
+            'video_id' => $videoId,
+            'title' => $title,
+            'description' => $description,
+            'duration_seconds' => max(5, $durationSeconds),
+            'duration_iso' => $durationIso,
+            'thumbnail_url' => $thumbUrl,
+            'thumbnail_quality' => $thumbQuality,
+        ];
+    }
+
+    /**
+     * Convert ISO 8601 duration (e.g. PT1M45S, PT3M, PT50S, PT1H2M10S) to total seconds.
+     */
+    public static function parseIso8601Duration(string $duration): int
+    {
+        try {
+            $interval = new DateInterval($duration);
+            return ($interval->h * 3600) + ($interval->i * 60) + $interval->s;
+        } catch (Throwable $e) {
+            if (preg_match('/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/i', $duration, $m)) {
+                $h = isset($m[1]) ? (int)$m[1] : 0;
+                $i = isset($m[2]) ? (int)$m[2] : 0;
+                $s = isset($m[3]) ? (int)$m[3] : 0;
+                return ($h * 3600) + ($i * 60) + $s;
+            }
+            return 60;
+        }
     }
 }

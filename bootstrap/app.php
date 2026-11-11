@@ -12,6 +12,9 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->redirectGuestsTo('/login');
+        $middleware->validateCsrfTokens(except: [
+            'creator/youtube/extract',
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

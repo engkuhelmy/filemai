@@ -152,6 +152,10 @@ Route::middleware(['auth'])->prefix('creator')->name('creator.')->group(function
     // Ciri 15: Tiket Sokongan & DMCA/Laporan Pelanggaran
     Route::post('/tickets', [StudioHubController::class, 'storeSupportTicket'])->name('tickets.store');
 
+    // Data Extraction & Auto-Fill from YouTube
+    Route::post('/youtube/extract', [CreatorEpisodeController::class, 'extractYouTube'])
+        ->name('youtube.extract');
+
     // Feature 1: Drama Episode Dashboard
     Route::get('/dramas/{drama}', [CreatorEpisodeController::class, 'index'])
         ->name('dramas.manage');

@@ -91,6 +91,11 @@ class StoreEpisodeRequest extends FormRequest
                 'mimes:jpg,jpeg,png,webp',
                 'max:5120',
             ],
+            'thumbnail_url' => [
+                'nullable',
+                'string',
+                'max:500',
+            ],
         ];
 
         if ($videoType === 'youtube') {

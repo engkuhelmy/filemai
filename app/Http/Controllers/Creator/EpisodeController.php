@@ -8,6 +8,7 @@ use App\Http\Requests\UpdateEpisodeRequest;
 use App\Models\Drama;
 use App\Models\Episode;
 use App\Helpers\MediaHelper;
+use App\Services\YouTubeService;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\JsonResponse;
@@ -150,6 +151,8 @@ class EpisodeController extends Controller
 
             $thumbFile->move($thumbDir, $thumbFilename);
             $thumbnailUrl = '/uploads/thumbnails/' . $thumbFilename;
+        } elseif (!empty($validated['thumbnail_url'])) {
+            $thumbnailUrl = trim($validated['thumbnail_url']);
         }
 
         // Feature 5: Status and Scheduled Date
@@ -248,6 +251,8 @@ class EpisodeController extends Controller
 
             $thumbFile->move($thumbDir, $thumbFilename);
             $episode->thumbnail_url = '/uploads/thumbnails/' . $thumbFilename;
+        } elseif (!empty($validated['thumbnail_url'])) {
+            $episode->thumbnail_url = trim($validated['thumbnail_url']);
         }
 
         // Feature 2: Metadata (Title, Episode Number, Description, Duration)
@@ -398,5 +403,31 @@ class EpisodeController extends Controller
             'success' => true,
             'message' => 'Susunan episod berjaya dikemaskini!',
         ]);
+    }
+
+    /**
+     * Data Extraction & Auto-Fill from YouTube:
+     * Extracts title, synopsis/description, duration (in seconds), and highest resolution thumbnail.
+     */
+    public function extractYouTube(Request $request): JsonResponse
+    {
+        $url = $request->input('url') ?? $request->input('youtube_url');
+        if (empty($url) || !is_string($url)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Sila masukkan pautan URL YouTube yang sah.',
+            ], 422);
+        }
+
+        $data = YouTubeService::extractVideoData($url);
+
+        if (empty($data['success'])) {
+            return response()->json([
+                'success' => false,
+                'message' => $data['message'] ?? 'Gagal memuat turun data video. Pastikan pautan sah dan video adalah Public/Unlisted.',
+            ], 422);
+        }
+
+        return response()->json($data);
     }
 }

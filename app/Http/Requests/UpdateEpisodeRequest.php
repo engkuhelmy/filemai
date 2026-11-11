@@ -94,6 +94,11 @@ class UpdateEpisodeRequest extends FormRequest
                 'mimes:jpg,jpeg,png,webp',
                 'max:5120',
             ],
+            'thumbnail_url' => [
+                'nullable',
+                'string',
+                'max:500',
+            ],
             'remove_custom_thumbnail' => [
                 'nullable',
                 'boolean',
