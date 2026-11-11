@@ -29,3 +29,4 @@ return new class extends Migration
         DB::statement("ALTER TABLE dramas MODIFY COLUMN type ENUM('series','movie') DEFAULT 'series'");
     }
 };
+
