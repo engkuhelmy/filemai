@@ -7,6 +7,7 @@ use App\Models\Episode;
 use App\Models\Ad;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
+use Carbon\Carbon;
 
 class EpisodeWatchController extends Controller
 {
@@ -21,30 +22,56 @@ class EpisodeWatchController extends Controller
     public function show(Drama $drama, Episode $episode, Request $request): View
     {
         // Ensure episode belongs to this drama
-        if ($episode->drama_id !== $drama->id) {
+        if ((int)$episode->drama_id !== (int)$drama->id) {
             abort(404, 'Episod tidak sah untuk drama ini.');
         }
 
-        // Increment episode view count asynchronously
-        $episode->increment('views_count');
-        $drama->increment('views_count');
+        $user = $request->user();
+        $isCreatorOrAdmin = $user && ($user->isAdmin() || (int)$drama->creator_id === (int)$user->id);
 
-        // Retrieve all episodes for sidebar/drawer playlist, ordered by episode_number ASC
-        $allEpisodes = $drama->episodes()->orderBy('episode_number', 'asc')->get();
+        // Feature 5: Visibility Check (Draft / Scheduled)
+        if (!$isCreatorOrAdmin) {
+            if ($episode->status === 'draft') {
+                abort(404, 'Episod ini masih dalam draf dan belum diterbitkan.');
+            }
+            if ($episode->status === 'scheduled' && $episode->scheduled_at && $episode->scheduled_at->isFuture()) {
+                abort(403, 'Episod ini dijadualkan untuk tayangan pada ' . $episode->scheduled_at->format('d/m/Y h:i A') . '.');
+            }
+        }
+
+        // Increment episode view count asynchronously (only if released or normal viewer)
+        if ($episode->status === 'published' || ($episode->status === 'scheduled' && $episode->scheduled_at && $episode->scheduled_at->isPast())) {
+            $episode->increment('views_count');
+            $drama->increment('views_count');
+        }
+
+        // Retrieve episodes for sidebar/drawer playlist
+        $episodesQuery = $drama->episodes();
+        if (!$isCreatorOrAdmin) {
+            $episodesQuery->where(function ($q) {
+                $q->where('status', 'published')
+                  ->orWhere(function ($sq) {
+                      $sq->where('status', 'scheduled')
+                         ->whereNotNull('scheduled_at')
+                         ->where('scheduled_at', '<=', now());
+                  });
+            });
+        }
+
+        $allEpisodes = (clone $episodesQuery)->orderBy('episode_number', 'asc')->get();
 
         // Determine next and previous episodes
-        $nextEpisode = $drama->episodes()
+        $nextEpisode = (clone $episodesQuery)
             ->where('episode_number', '>', $episode->episode_number)
             ->orderBy('episode_number', 'asc')
             ->first();
 
-        $prevEpisode = $drama->episodes()
+        $prevEpisode = (clone $episodesQuery)
             ->where('episode_number', '<', $episode->episode_number)
             ->orderBy('episode_number', 'desc')
             ->first();
 
         // Check if authenticated user has active VIP Ad-Free subscription
-        $user = $request->user();
         $isPremium = $user ? $user->isPremium() : false;
 
         // Fetch 1 random active interstitial ad if viewer is free/guest
@@ -64,6 +91,7 @@ class EpisodeWatchController extends Controller
             'prevEpisode' => $prevEpisode,
             'isPremium' => $isPremium,
             'ad' => $ad,
+            'isCreatorPreview' => $isCreatorOrAdmin && ($episode->status !== 'published'),
             'title' => "Tonton {$episode->title} - {$drama->title} | Filemai",
         ]);
     }

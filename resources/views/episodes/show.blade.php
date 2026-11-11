@@ -41,6 +41,9 @@
         }
     </script>
 
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
     <!-- YouTube IFrame Player API -->
     <script src="https://www.youtube.com/iframe_api"></script>
 
@@ -50,588 +53,576 @@
     <style>
         html, body {
             height: 100%;
-            background-color: #08090b;
-            touch-action: pan-x pan-y;
+            width: 100%;
+            background-color: #000000;
+            overflow: hidden;
+            touch-action: none;
+            -webkit-user-select: none;
+            user-select: none;
         }
 
-        .vertical-theater {
+        /* 9:16 Responsive Container */
+        .tiktok-stage {
             position: relative;
             width: 100%;
+            height: 100dvh;
             max-width: 440px;
-            aspect-ratio: 9 / 16;
-            background: #000;
-            box-shadow: 0 0 60px rgba(0, 0, 0, 0.9);
-            border-radius: 1.5rem;
+            background: #000000;
             overflow: hidden;
         }
 
-        @media (max-width: 768px) {
-            .vertical-theater {
-                max-width: 100%;
-                height: 100vh;
-                height: 100dvh;
-                aspect-ratio: unset;
-                border-radius: 0;
+        @media (min-width: 768px) {
+            .tiktok-stage {
+                height: 94vh;
+                max-height: 880px;
+                aspect-ratio: 9 / 16;
+                border-radius: 28px;
+                box-shadow: 0 0 60px rgba(229, 9, 20, 0.25), 0 25px 50px -12px rgba(0, 0, 0, 0.9);
+                border: 1px solid rgba(255, 255, 255, 0.12);
             }
         }
 
-        .yt-iframe-container iframe {
+        /* Ambient background glow */
+        .ambient-glow {
+            position: fixed;
+            inset: -10%;
+            background-size: cover;
+            background-position: center;
+            filter: blur(80px) brightness(0.22);
+            opacity: 0.6;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        /* YouTube IFrame Fill */
+        .yt-frame-container iframe {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
             border: 0;
+            object-fit: cover;
+        }
+
+        /* Custom Scrollbar for Drawer */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
         }
     </style>
 </head>
-<body class="bg-[#08090b] text-white select-none min-h-screen flex items-center justify-center p-0 md:p-6 font-sans"
-      x-data="episodePlayer({
-          episodeId: {{ (int)$episode->id }},
+<body class="bg-black text-white min-h-screen flex items-center justify-center font-sans relative"
+      x-data="tiktokDramaPlayer({
+          dramaSlug: '{{ $drama->slug }}',
+          dramaTitle: '{{ addslashes($drama->title) }}',
           currentEpisodeNumber: {{ (int)$episode->episode_number }},
-          nextEpisodeUrl: {{ $nextEpisode ? json_encode(route('episodes.show', ['drama' => $drama->slug, 'episode' => $nextEpisode->episode_number])) : 'null' }},
-          prevEpisodeUrl: {{ $prevEpisode ? json_encode(route('episodes.show', ['drama' => $drama->slug, 'episode' => $prevEpisode->episode_number])) : 'null' }},
+          totalEpisodes: {{ count($allEpisodes) }},
+          nextUrl: {{ $nextEpisode ? json_encode(route('episodes.show', ['drama' => $drama->slug, 'episode' => $nextEpisode->episode_number])) : 'null' }},
+          prevUrl: {{ $prevEpisode ? json_encode(route('episodes.show', ['drama' => $drama->slug, 'episode' => $prevEpisode->episode_number])) : 'null' }},
           nextEpisodeNumber: {{ $nextEpisode ? (int)$nextEpisode->episode_number : 'null' }},
-          nextEpisodeTitle: {{ $nextEpisode ? json_encode($nextEpisode->title) : 'null' }},
-          youtubeVideoId: {{ json_encode($episode->youtube_video_id ?? '') }},
-          isPremium: {{ $isPremium ? 'true' : 'false' }},
-          hasAd: {{ ($ad && !$isPremium) ? 'true' : 'false' }},
-          adDuration: {{ $ad ? (int)$ad->duration_seconds : 15 }}
-      })">
+          prevEpisodeNumber: {{ $prevEpisode ? (int)$prevEpisode->episode_number : 'null' }},
+          youtubeId: '{{ $episode->effective_youtube_id ?? '' }}',
+          videoUrl: '{{ $episode->video_url ?? '' }}',
+          isYouTube: {{ $episode->isYouTube() ? 'true' : 'false' }}
+      })"
+      @keydown.window="handleKeyDown($event)"
+      @wheel.window="handleWheel($event)">
 
-    <!-- Responsive Layout: 9:16 Vertical Theater (Center/Left) + Episode Playlist (Right) -->
-    <div class="w-full max-w-6xl mx-auto flex flex-col lg:flex-row items-center justify-center gap-8 h-full md:h-auto">
+    @php
+        $ytId = $episode->effective_youtube_id;
+        $isYt = !empty($ytId) || $episode->isYouTube();
+        $bgPoster = $episode->thumbnail_url ?: ($drama->banner_url ?: $drama->poster_url);
+    @endphp
 
-        <!-- ========================================================== -->
-        <!-- 9:16 VERTICAL VIDEO PLAYER THEATER -->
-        <!-- ========================================================== -->
-        <div class="vertical-theater flex flex-col justify-between relative border border-white/10 shrink-0"
-             id="theaterContainer"
-             @touchstart="onTouchStart($event)"
-             @touchend="onTouchEnd($event)">
+    <!-- Ambient Poster Glow for Desktop Viewers -->
+    <div class="ambient-glow hidden md:block" style="background-image: url('{{ $bgPoster }}');"></div>
 
-            <!-- YouTube IFrame Container -->
-            <div class="absolute inset-0 w-full h-full z-0 yt-iframe-container bg-black" id="ytContainer">
-                <div id="ytPlayerFrame" class="w-full h-full"></div>
-            </div>
+    <!-- Main TikTok Viewport Frame -->
+    <div class="tiktok-stage relative z-10 flex flex-col justify-between"
+         x-ref="tiktokStage"
+         @touchstart="handleTouchStart($event)"
+         @touchmove="handleTouchMove($event)"
+         @touchend="handleTouchEnd($event)">
 
-            <!-- Top Header Overlay Controls -->
-            <div class="relative z-20 p-4 bg-gradient-to-b from-black/95 via-black/60 to-transparent flex items-center justify-between pointer-events-auto">
-                <div class="flex items-center gap-3 min-w-0">
-                    <a href="{{ route('home') }}" 
-                       class="w-9 h-9 rounded-full bg-black/60 backdrop-blur-md flex items-center justify-center text-white hover:bg-white/20 transition-all border border-white/10 shrink-0">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+        <!-- ======================================================== -->
+        <!-- VIDEO LAYER (YOUTUBE SHORTS / EMBED OR DIRECT HTML5)     -->
+        <!-- ======================================================== -->
+        <div class="absolute inset-0 w-full h-full bg-black z-0 overflow-hidden">
+            @if (!empty($ytId))
+                <!-- YouTube Vertical Embed -->
+                <div class="yt-frame-container absolute inset-0 w-full h-full">
+                    <iframe id="ytPlayer"
+                            class="w-full h-full"
+                            src="https://www.youtube-nocookie.com/embed/{{ $ytId }}?enablejsapi=1&autoplay=1&mute=0&playsinline=1&controls=1&rel=0&modestbranding=1&loop=1"
+                            title="{{ $episode->title }}"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                            allowfullscreen>
+                    </iframe>
+                </div>
+            @elseif (!empty($episode->video_url))
+                <!-- Direct Video Storage Fallback -->
+                <video x-ref="directVideo"
+                       id="directVideo"
+                       class="w-full h-full object-cover"
+                       src="{{ $episode->video_url }}"
+                       autoplay
+                       playsinline
+                       webkit-playsinline
+                       loop
+                       poster="{{ $bgPoster }}"
+                       @click="toggleDirectPlay()">
+                </video>
+            @else
+                <!-- No Media Placeholder -->
+                <div class="w-full h-full flex flex-col items-center justify-center p-6 text-center bg-neutral-950">
+                    <i data-lucide="video-off" class="w-12 h-12 text-neutral-600 mb-3"></i>
+                    <p class="text-sm font-semibold text-neutral-400">Media episod belum dimuat naik.</p>
+                </div>
+            @endif
+        </div>
+
+        <!-- ======================================================== -->
+        <!-- TOP OVERLAY BAR: BACK, TITLE, EPISODE COUNTER            -->
+        <!-- ======================================================== -->
+        <div class="relative z-20 p-4 pt-5 bg-gradient-to-b from-black/90 via-black/50 to-transparent flex items-center justify-between pointer-events-auto">
+            <div class="flex items-center gap-2.5 min-w-0">
+                <!-- Back Button to Drama Main Page -->
+                <a href="{{ route('drama.show', $drama->slug) }}" 
+                   class="w-9 h-9 rounded-full bg-black/60 backdrop-blur-md border border-white/15 flex items-center justify-center text-white hover:bg-white/20 transition-all shrink-0"
+                   title="Kembali ke Halaman Drama">
+                    <i data-lucide="chevron-left" class="w-5 h-5"></i>
+                </a>
+
+                <div class="flex flex-col min-w-0">
+                    <a href="{{ route('drama.show', $drama->slug) }}" class="text-xs font-bold text-white truncate max-w-[180px] sm:max-w-[220px] hover:underline">
+                        {{ $drama->title }}
                     </a>
-                    <div class="flex flex-col min-w-0">
-                        <span class="text-xs font-bold text-white truncate max-w-[170px] sm:max-w-[200px]">{{ $drama->title }}</span>
-                        <span class="text-[11px] text-[#E50914] font-semibold truncate">{{ $episode->title }}</span>
+                    <div class="flex items-center gap-1.5 text-[11px] text-red-500 font-extrabold">
+                        <span>Episod {{ $episode->episode_number }} / {{ count($allEpisodes) }}</span>
+                        @if (!empty($ytId))
+                            <span class="px-1.5 py-0.2 rounded bg-red-600/30 text-red-400 text-[9px] font-black border border-red-500/40">YT</span>
+                        @endif
+                        <span class="px-1 py-0.2 rounded bg-white/10 text-white text-[9px] font-bold">{{ $drama->age_rating ?? '13+' }}</span>
                     </div>
-                </div>
-
-                <div class="flex items-center gap-2 shrink-0">
-                    <!-- YouTube Badge -->
-                    <span class="px-2 py-0.5 rounded text-[10px] font-black tracking-wide bg-red-500/20 text-red-400 border border-red-500/30 flex items-center gap-1">
-                        <svg class="w-3 h-3 fill-red-400" viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
-                        <span>YT</span>
-                    </span>
-
-                    <!-- VIP / Ad-Free Status Badge -->
-                    @if ($isPremium)
-                        <span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1">
-                            <svg class="w-3 h-3 fill-amber-400" viewBox="0 0 24 24"><path d="M5 16L3 5l5.5 5L12 4l3.5 6L21 5l-2 11H5m14 3c0 .6-.4 1-1 1H6c-.6 0-1-.4-1-1v-1h14v1z"/></svg>
-                            VIP
-                        </span>
-                    @else
-                        <a href="/subscribe" class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-[#E50914] hover:bg-[#F40612] text-white flex items-center gap-1 shadow-md transition-transform hover:scale-105">
-                            <svg class="w-3 h-3 fill-white" viewBox="0 0 24 24"><path d="M5 16L3 5l5.5 5L12 4l3.5 6L21 5l-2 11H5m14 3c0 .6-.4 1-1 1H6c-.6 0-1-.4-1-1v-1h14v1z"/></svg>
-                            VIP RM5
-                        </a>
-                    @endif
-
-                    <!-- Mobile Drawer Toggle -->
-                    <button @click="drawerOpen = true" 
-                            class="lg:hidden w-9 h-9 rounded-full bg-black/60 backdrop-blur-md flex items-center justify-center text-white hover:bg-white/20 transition-all border border-white/10">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
-                    </button>
                 </div>
             </div>
 
-            <!-- Bottom Controls & Quick Nav -->
-            <div class="relative z-20 p-4 bg-gradient-to-t from-black/95 via-black/75 to-transparent space-y-3 pointer-events-auto">
-                <div class="flex items-center justify-between gap-3">
-                    @if ($prevEpisode)
-                        <a href="{{ route('episodes.show', ['drama' => $drama->slug, 'episode' => $prevEpisode->episode_number]) }}" 
-                           class="flex-1 py-2.5 px-3 rounded-full bg-white/15 hover:bg-white/25 border border-white/10 flex items-center justify-center gap-1.5 text-xs font-bold transition-colors">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"/></svg>
-                            <span>Episod {{ $prevEpisode->episode_number }}</span>
-                        </a>
-                    @else
-                        <div class="flex-1 py-2.5 px-3 rounded-full bg-white/5 border border-white/5 text-center text-xs text-slate-500">
-                            Episod Pertama
-                        </div>
-                    @endif
+            <div class="flex items-center gap-2 shrink-0">
+                <!-- Episode Selector Button (Top Shortcut) -->
+                <button @click="openEpisodeDrawer()"
+                        class="px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-md border border-white/20 hover:border-red-500/50 text-xs font-bold text-white flex items-center gap-1.5 shadow-lg transition-all hover:scale-105">
+                    <i data-lucide="layers" class="w-3.5 h-3.5 text-red-500"></i>
+                    <span>Episod</span>
+                </button>
+            </div>
+        </div>
 
-                    @if ($nextEpisode)
-                        <button @click="triggerNextEpisode('{{ route('episodes.show', ['drama' => $drama->slug, 'episode' => $nextEpisode->episode_number]) }}')" 
-                                class="flex-1 py-2.5 px-3 rounded-full bg-[#E50914] hover:bg-[#F40612] text-white flex items-center justify-center gap-1.5 text-xs font-black shadow-lg shadow-red-950/80 transition-all">
-                            <span>Episod {{ $nextEpisode->episode_number }}</span>
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"/></svg>
-                        </button>
-                    @else
-                        <a href="{{ route('home') }}" 
-                           class="flex-1 py-2.5 px-3 rounded-full bg-white/15 hover:bg-white/25 text-center text-xs font-bold text-white transition-colors">
-                            Selesai Siri
-                        </a>
-                    @endif
+        <!-- 11. Creator Notice Board Announcement Overlay (If Any) -->
+        @if(!empty($drama->announcement))
+            <div class="relative z-20 mx-4 -mt-2 mb-2 py-1.5 px-3 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[11px] flex items-center gap-2 pointer-events-auto backdrop-blur-md">
+                <i data-lucide="megaphone" class="w-3.5 h-3.5 text-amber-400 shrink-0"></i>
+                <span class="truncate font-medium">{{ $drama->announcement }}</span>
+            </div>
+        @endif
+
+        <!-- ======================================================== -->
+        <!-- RIGHT TIKTOK ACTION SIDEBAR (FLOATING CONTROLS)          -->
+        <!-- ======================================================== -->
+        <div class="absolute right-3 bottom-24 z-20 flex flex-col items-center gap-4 pointer-events-auto">
+            
+            <!-- 1. Creator Avatar -->
+            <div class="relative mb-1">
+                <div class="w-11 h-11 rounded-full p-0.5 bg-gradient-to-tr from-yellow-500 via-red-600 to-pink-500 shadow-xl">
+                    <div class="w-full h-full rounded-full bg-[#181818] overflow-hidden flex items-center justify-center text-xs font-black text-white">
+                        {{ strtoupper(substr($drama->title, 0, 2)) }}
+                    </div>
                 </div>
+                <button class="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-red-600 flex items-center justify-center text-white text-[10px] font-black shadow">
+                    +
+                </button>
             </div>
 
-            <!-- ========================================================== -->
-            <!-- 2-SECOND AUTO-PLAY COUNTDOWN OVERLAY (PREMIUM / VIP ONLY) -->
-            <!-- ========================================================== -->
-            <div x-show="showCountdownOverlay" 
-                 x-transition:enter="transition ease-out duration-300"
-                 x-transition:enter-start="opacity-0 scale-95"
-                 x-transition:enter-end="opacity-100 scale-100"
-                 class="absolute inset-0 z-40 bg-black/90 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center space-y-4"
-                 style="display: none;">
-                
-                <div class="relative w-20 h-20 flex items-center justify-center">
-                    <svg class="w-full h-full transform -rotate-90">
-                        <circle cx="40" cy="40" r="34" stroke="currentColor" stroke-width="4" class="text-white/20" fill="transparent"/>
-                        <circle cx="40" cy="40" r="34" stroke="currentColor" stroke-width="4" class="text-[#E50914] transition-all duration-1000 ease-linear"
-                                fill="transparent"
-                                stroke-dasharray="213.6"
-                                :stroke-dashoffset="213.6 * (1 - (countdownSeconds / 2))"/>
-                    </svg>
-                    <span class="absolute text-2xl font-black text-white" x-text="countdownSeconds">2</span>
+            <!-- 2. Episode Selection Button (Primary Request) -->
+            <button @click="openEpisodeDrawer()"
+                    class="group flex flex-col items-center gap-1">
+                <div class="w-11 h-11 rounded-full bg-black/65 backdrop-blur-md border border-white/20 group-hover:border-red-500/80 group-hover:bg-red-600/20 flex items-center justify-center text-white shadow-xl transition-all group-hover:scale-110">
+                    <i data-lucide="list-video" class="w-5 h-5 text-red-500"></i>
                 </div>
+                <span class="text-[10px] font-bold text-white tracking-wide shadow-sm">Episod</span>
+            </button>
 
-                <div class="space-y-1 max-w-xs">
-                    <span class="text-[11px] font-bold text-[#E50914] uppercase tracking-wider">VIP Auto-Advance</span>
-                    <h3 class="text-base font-extrabold text-white" x-text="nextEpisodeTitle"></h3>
+            <!-- 3. Like Button with Tap Heart Animation -->
+            <button @click="toggleLike()"
+                    class="group flex flex-col items-center gap-1">
+                <div class="w-11 h-11 rounded-full bg-black/65 backdrop-blur-md border border-white/20 flex items-center justify-center text-white shadow-xl transition-all group-hover:scale-110"
+                     :class="liked ? 'bg-red-600/30 border-red-500' : ''">
+                    <i data-lucide="heart" 
+                       class="w-5 h-5 transition-transform duration-200"
+                       :class="liked ? 'fill-red-500 text-red-500 scale-125' : 'text-white'"></i>
                 </div>
+                <span class="text-[10px] font-bold text-white" x-text="likeCountFormatted">12.4K</span>
+            </button>
 
-                <div class="flex items-center gap-3 pt-2">
-                    <button @click="cancelAutoPlay()" class="px-5 py-2.5 rounded-full bg-white/10 hover:bg-white/20 text-xs font-bold text-slate-300 transition-colors">
-                        Kekal di Sini
-                    </button>
-                    <button @click="proceedNextImmediately()" class="px-6 py-2.5 rounded-full bg-[#E50914] hover:bg-[#F40612] text-xs font-extrabold text-white shadow-lg flex items-center gap-1.5 transition-all">
-                        <span>Main Sekarang</span>
-                        <svg class="w-3.5 h-3.5 fill-white" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-                    </button>
+            <!-- 4. Share Button -->
+            <button @click="shareEpisode()"
+                    class="group flex flex-col items-center gap-1">
+                <div class="w-11 h-11 rounded-full bg-black/65 backdrop-blur-md border border-white/20 flex items-center justify-center text-white shadow-xl transition-all group-hover:scale-110">
+                    <i data-lucide="share-2" class="w-5 h-5 text-white"></i>
                 </div>
-            </div>
+                <span class="text-[10px] font-bold text-white">Kongsi</span>
+            </button>
 
-            <!-- ========================================================== -->
-            <!-- STRICT INTERSTITIAL AD-GATE MODAL (#adModal FOR FREE USERS) -->
-            <!-- ========================================================== -->
-            @if ($ad && !$isPremium)
-            <div id="adModal"
-                 x-show="showAdModal" 
-                 x-transition:enter="transition ease-out duration-300"
-                 x-transition:enter-start="opacity-0 scale-95"
-                 x-transition:enter-end="opacity-100 scale-100"
-                 class="absolute inset-0 z-50 bg-[#0c0d10]/98 backdrop-blur-2xl flex flex-col justify-between p-6"
-                 style="display: none;">
-                
-                <!-- Ad Header -->
-                <div class="flex items-center justify-between border-b border-white/10 pb-4">
-                    <div class="flex items-center gap-2">
-                        <span class="px-2 py-0.5 rounded bg-[#E50914] text-white text-[10px] font-black uppercase tracking-wider">
-                            Iklan Interstitial
-                        </span>
-                        <span class="text-xs text-slate-300 truncate max-w-[150px]">{{ $ad->sponsor_name ?? 'Penaja Rasmi' }}</span>
+            <!-- 5. Next Episode Quick Trigger -->
+            @if ($nextEpisode)
+                <button @click="goNext()"
+                        title="Episod Seterusnya (Swipe Up)"
+                        class="group flex flex-col items-center gap-1">
+                    <div class="w-11 h-11 rounded-full bg-[#E50914] text-white flex items-center justify-center shadow-xl shadow-red-950/80 transition-all hover:scale-110 animate-bounce">
+                        <i data-lucide="arrow-up" class="w-5 h-5"></i>
                     </div>
-
-                    <!-- Countdown Lock Badge -->
-                    <div class="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#181818] border border-white/10 text-xs font-bold"
-                         :class="adCountdown > 0 ? 'text-amber-400' : 'text-emerald-400 border-emerald-500/40'">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                        <template x-if="adCountdown > 0">
-                            <span>Kunci dibuka: <strong class="text-white ml-0.5" x-text="adCountdown"></strong>s</span>
-                        </template>
-                        <template x-if="adCountdown <= 0">
-                            <span class="font-black text-emerald-400">Sedia Ditonton!</span>
-                        </template>
-                    </div>
-                </div>
-
-                <!-- Ad Body & Media -->
-                <div class="my-auto space-y-4 text-center">
-                    <div class="relative w-full aspect-video rounded-2xl overflow-hidden bg-[#181818] border border-white/10 shadow-2xl">
-                        <video id="adVideo" 
-                               class="w-full h-full object-cover" 
-                               src="{{ $ad->video_url }}" 
-                               autoplay 
-                               playsinline 
-                               muted
-                               x-ref="adVideoPlayer">
-                        </video>
-                    </div>
-
-                    <div class="space-y-1">
-                        <h3 class="text-base font-extrabold text-white">{{ $ad->title }}</h3>
-                        <p class="text-xs text-slate-400 max-w-xs mx-auto">Tonton iklan {{ $ad->duration_seconds ?? 15 }} saat ini sehingga selesai untuk melangkah ke episod seterusnya.</p>
-                    </div>
-
-                    @if (!empty($ad->click_url))
-                        <a href="{{ $ad->click_url }}" target="_blank" 
-                           class="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-white/10 hover:bg-white/20 text-[#E50914] text-xs font-bold border border-[#E50914]/40 transition-colors">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
-                            Lawati Laman Web Penaja
-                        </a>
-                    @endif
-                </div>
-
-                <!-- Ad Footer: Strictly Gated Action Button -->
-                <div class="space-y-3 pt-4 border-t border-white/10">
-                    <button @click="skipAdAndPlayNext()" 
-                            :disabled="adCountdown > 0"
-                            class="w-full py-3.5 rounded-full text-xs font-extrabold flex items-center justify-center gap-2 transition-all"
-                            :class="adCountdown > 0 ? 'bg-[#222222] text-slate-500 cursor-not-allowed border border-white/5 opacity-80' : 'bg-[#E50914] hover:bg-[#F40612] text-white shadow-xl shadow-red-950/80 cursor-pointer'">
-                        <template x-if="adCountdown > 0">
-                            <span class="flex items-center gap-2">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-                                <span>Menonton Iklan... (<span x-text="adCountdown"></span>s)</span>
-                            </span>
-                        </template>
-                        <template x-if="adCountdown <= 0">
-                            <span class="flex items-center gap-2">
-                                <span>Langkau Iklan &amp; Tonton Episod Seterusnya</span>
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
-                            </span>
-                        </template>
-                    </button>
-
-                    <div class="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between text-xs">
-                        <div class="flex items-center gap-2 text-amber-300 font-medium">
-                            <svg class="w-4 h-4 fill-amber-400" viewBox="0 0 24 24"><path d="M5 16L3 5l5.5 5L12 4l3.5 6L21 5l-2 11H5m14 3c0 .6-.4 1-1 1H6c-.6 0-1-.4-1-1v-1h14v1z"/></svg>
-                            <span>Langkau semua iklan dengan VIP RM5</span>
-                        </div>
-                        <a href="/subscribe" class="px-3 py-1 rounded-full bg-amber-500 text-slate-950 font-bold hover:bg-amber-400 transition-colors">
-                            Langgan
-                        </a>
-                    </div>
-                </div>
-
-            </div>
+                    <span class="text-[10px] font-black text-red-400">Next</span>
+                </button>
             @endif
 
-            <!-- Slide-over Episode Drawer Modal (Mobile View) -->
-            <div x-show="drawerOpen" 
-                 x-transition:enter="transition ease-out duration-250"
-                 x-transition:enter-start="translate-y-full"
-                 x-transition:enter-end="translate-y-0"
-                 x-transition:leave="transition ease-in duration-200"
-                 x-transition:leave-start="translate-y-0"
-                 x-transition:leave-end="translate-y-full"
-                 class="lg:hidden absolute inset-x-0 bottom-0 z-40 max-h-[75vh] bg-[#141414]/95 backdrop-blur-2xl border-t border-white/10 rounded-t-3xl p-5 flex flex-col"
-                 style="display: none;">
-                
-                <div class="flex items-center justify-between border-b border-white/10 pb-3 mb-4">
-                    <div>
-                        <h3 class="text-base font-extrabold text-white">Senarai Episod</h3>
-                        <p class="text-xs text-slate-400">{{ $drama->title }}</p>
-                    </div>
-                    <button @click="drawerOpen = false" class="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-slate-300 hover:text-white">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                    </button>
-                </div>
+        </div>
 
-                <div class="overflow-y-auto space-y-2 pr-1 flex-1">
-                    @foreach ($allEpisodes as $ep)
-                        <div @click="handleEpisodeClick('{{ route('episodes.show', ['drama' => $drama->slug, 'episode' => $ep->episode_number]) }}', {{ (int)$ep->episode_number }})"
-                             class="p-3 rounded-xl flex items-center justify-between gap-3 cursor-pointer transition-colors {{ ($ep->id == $episode->id) ? 'bg-[#E50914]/20 border border-[#E50914]/50 text-white' : 'bg-[#181818] hover:bg-[#222] text-slate-300 border border-white/5' }}">
-                            <div class="flex items-center gap-3">
-                                <span class="w-7 h-7 rounded-lg {{ ($ep->id == $episode->id) ? 'bg-[#E50914] text-white' : 'bg-white/10 text-slate-400' }} flex items-center justify-center text-xs font-bold shrink-0">
-                                    {{ $ep->episode_number }}
-                                </span>
-                                <span class="text-xs font-medium truncate max-w-[200px]">{{ $ep->title }}</span>
-                            </div>
-                            <div class="flex items-center gap-2 text-[10px] text-slate-400 shrink-0">
-                                <span class="text-red-400 font-bold">YT</span>
-                                @if ($ep->id == $episode->id)
-                                    <span class="px-1.5 py-0.5 rounded bg-[#E50914] text-white font-bold">Sedang Main</span>
-                                @endif
-                            </div>
-                        </div>
-                    @endforeach
-                </div>
+        <!-- ======================================================== -->
+        <!-- BOTTOM OVERLAY: TITLE, SYNOPSIS & SWIPE UP HINT          -->
+        <!-- ======================================================== -->
+        <div class="relative z-20 p-4 pb-6 bg-gradient-to-t from-black/95 via-black/75 to-transparent space-y-2.5 pointer-events-auto">
+            
+            <!-- Drama Creator Tag -->
+            <div class="flex items-center gap-2">
+                <span class="text-xs font-black text-white hover:underline cursor-pointer">
+                    @ {{ $drama->title }}
+                </span>
+                <span class="px-2 py-0.5 rounded-full bg-white/10 text-[9px] font-bold text-slate-300">
+                    {{ $drama->genre }}
+                </span>
+            </div>
+
+            <!-- Episode Title -->
+            <h2 class="text-sm sm:text-base font-extrabold text-white leading-tight">
+                {{ $episode->title }}
+            </h2>
+
+            <!-- Swipe Navigation Pill Indicator -->
+            <div class="flex items-center justify-between pt-1">
+                @if ($nextEpisode)
+                    <div @click="goNext()"
+                         class="cursor-pointer inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/15 hover:bg-white/25 border border-white/20 text-xs font-bold text-white transition-all shadow-md">
+                        <span class="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
+                        <i data-lucide="chevron-up" class="w-4 h-4 text-red-400 animate-pulse"></i>
+                        <span>Swipe ke atas: <strong>Episod {{ $nextEpisode->episode_number }}</strong></span>
+                    </div>
+                @else
+                    <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 text-xs font-semibold text-slate-400">
+                        <i data-lucide="check-circle" class="w-3.5 h-3.5 text-green-400"></i>
+                        <span>Episod Akhir Siri</span>
+                    </div>
+                @endif
+
+                @if ($prevEpisode)
+                    <button @click="goPrev()" 
+                            class="text-[11px] font-bold text-slate-400 hover:text-white flex items-center gap-1 transition-colors">
+                        <i data-lucide="chevron-down" class="w-3.5 h-3.5"></i>
+                        <span>Ep {{ $prevEpisode->episode_number }}</span>
+                    </button>
+                @endif
             </div>
 
         </div>
 
-        <!-- ========================================================== -->
-        <!-- DESKTOP EPISODE PLAYLIST SIDEBAR (RIGHT COLUMN) -->
-        <!-- ========================================================== -->
-        <div class="hidden lg:flex flex-col w-80 max-h-[780px] rounded-3xl bg-[#121316] border border-white/10 p-5 shadow-2xl space-y-4">
-            <div class="border-b border-white/10 pb-3 flex items-center justify-between">
-                <div>
-                    <h3 class="text-sm font-extrabold text-white flex items-center gap-2">
-                        <svg class="w-4 h-4 text-[#E50914]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
-                        Senarai Episod
-                    </h3>
-                    <p class="text-[11px] text-slate-400">{{ count($allEpisodes) }} Episod Siri</p>
+        <!-- ======================================================== -->
+        <!-- SLIDE-UP EPISODE SELECTOR DRAWER (BOTTOM SHEET)          -->
+        <!-- ======================================================== -->
+        <div x-show="episodeDrawerOpen"
+             x-transition:enter="transition ease-out duration-300"
+             x-transition:enter-start="translate-y-full opacity-0"
+             x-transition:enter-end="translate-y-0 opacity-100"
+             x-transition:leave="transition ease-in duration-200"
+             x-transition:leave-start="translate-y-0 opacity-100"
+             x-transition:leave-end="translate-y-full opacity-0"
+             class="absolute inset-x-0 bottom-0 z-50 max-h-[75%] bg-[#0e1015]/95 backdrop-blur-2xl border-t border-white/15 rounded-t-3xl p-5 flex flex-col shadow-2xl pointer-events-auto"
+             style="display: none;"
+             @click.outside="episodeDrawerOpen = false">
+
+            <!-- Drawer Header -->
+            <div class="flex items-center justify-between border-b border-white/10 pb-3 mb-3">
+                <div class="flex items-center gap-2">
+                    <i data-lucide="layers" class="w-5 h-5 text-[#E50914]"></i>
+                    <div>
+                        <h3 class="text-sm font-extrabold text-white">Pilih Episod</h3>
+                        <p class="text-[11px] text-slate-400">
+                            <a href="{{ route('drama.show', $drama->slug) }}" class="text-slate-300 hover:text-red-400 hover:underline font-bold">{{ $drama->title }}</a> • {{ count($allEpisodes) }} Episod
+                        </p>
+                    </div>
                 </div>
-                @if ($isPremium)
-                    <span class="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-bold border border-amber-500/30">
-                        Ad-Free VIP
-                    </span>
-                @else
-                    <span class="px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 text-[10px] font-semibold">
-                        Percuma (Iklan)
-                    </span>
-                @endif
+
+                <button @click="episodeDrawerOpen = false" 
+                        class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-slate-300 hover:text-white transition-colors">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
             </div>
 
-            <!-- Scrollable Episodes List with Intercepted Future Episodes -->
-            <div class="overflow-y-auto space-y-2 pr-1 flex-1">
+            <!-- Scrollable Episodes Grid / List -->
+            <div class="overflow-y-auto space-y-2 pr-1 flex-1 no-scrollbar max-h-[50vh]">
                 @foreach ($allEpisodes as $ep)
-                    <div @click="handleEpisodeClick('{{ route('episodes.show', ['drama' => $drama->slug, 'episode' => $ep->episode_number]) }}', {{ (int)$ep->episode_number }})"
-                         class="p-3 rounded-2xl flex items-center justify-between gap-3 cursor-pointer transition-all {{ ($ep->id == $episode->id) ? 'bg-[#E50914]/20 border border-[#E50914]/50 text-white shadow-md' : 'bg-[#18191d] hover:bg-[#202227] text-slate-300 border border-white/5' }}">
+                    @php
+                        $isActive = ($ep->id === $episode->id);
+                        $epYt = $ep->effective_youtube_id;
+                    @endphp
+                    <a href="{{ route('episodes.show', ['drama' => $drama->slug, 'episode' => $ep->episode_number]) }}"
+                       class="p-3 rounded-2xl flex items-center justify-between gap-3 cursor-pointer transition-all {{ $isActive ? 'bg-[#E50914] text-white shadow-lg shadow-red-950/80 font-bold' : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/5' }}">
+                        
                         <div class="flex items-center gap-3 min-w-0">
-                            <span class="w-8 h-8 rounded-xl {{ ($ep->id == $episode->id) ? 'bg-[#E50914] text-white shadow' : 'bg-white/5 text-slate-400' }} flex items-center justify-center text-xs font-extrabold shrink-0">
+                            <span class="w-8 h-8 rounded-xl {{ $isActive ? 'bg-white text-red-600' : 'bg-white/10 text-slate-300' }} flex items-center justify-center text-xs font-black shrink-0">
                                 {{ $ep->episode_number }}
                             </span>
                             <div class="min-w-0">
-                                <h4 class="text-xs font-bold text-white truncate">{{ $ep->title }}</h4>
-                                <div class="flex items-center gap-1.5 text-[10px] text-slate-400 mt-0.5">
-                                    <span class="text-red-400 font-bold">YouTube</span>
-                                    <span>•</span>
-                                    <span>{{ gmdate('i:s', $ep->duration ?? 60) }}</span>
+                                <h4 class="text-xs font-bold truncate {{ $isActive ? 'text-white' : 'text-slate-200' }}">
+                                    {{ $ep->title }}
+                                </h4>
+                                <div class="flex items-center gap-1.5 text-[10px] {{ $isActive ? 'text-white/80' : 'text-slate-400' }} mt-0.5">
+                                    @if (!empty($epYt))
+                                        <span class="font-bold flex items-center gap-0.5">
+                                            <i data-lucide="youtube" class="w-3 h-3 text-red-400"></i> YouTube
+                                        </span>
+                                        <span>•</span>
+                                    @endif
+                                    <span>{{ $ep->formatted_duration }}</span>
                                 </div>
                             </div>
                         </div>
 
-                        <div class="shrink-0 flex items-center">
-                            @if ($ep->id == $episode->id)
-                                <span class="w-6 h-6 rounded-full bg-[#E50914] text-white flex items-center justify-center">
-                                    <svg class="w-3 h-3 fill-white ml-0.5" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-                                </span>
-                            @elseif (!$isPremium && $ep->episode_number > $episode->episode_number)
-                                <span class="w-6 h-6 rounded-full bg-white/5 text-slate-400 flex items-center justify-center" title="Perlu tonton iklan">
-                                    <svg class="w-3 h-3 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                        <div class="shrink-0">
+                            @if ($isActive)
+                                <span class="px-2 py-0.5 rounded-full bg-white/20 text-white text-[10px] font-black uppercase">
+                                    Sedang Main
                                 </span>
                             @else
-                                <span class="w-6 h-6 rounded-full bg-white/5 text-slate-400 flex items-center justify-center hover:bg-white/10">
-                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-                                </span>
+                                <i data-lucide="play" class="w-4 h-4 text-slate-400 hover:text-white"></i>
                             @endif
                         </div>
-                    </div>
+                    </a>
                 @endforeach
             </div>
 
-            <!-- Ad-Free Subscription Promo Callout -->
-            @if (!$isPremium)
-                <div class="pt-2 border-t border-white/10">
-                    <a href="/subscribe" class="block p-3 rounded-2xl bg-gradient-to-r from-red-950/40 to-amber-950/40 border border-[#E50914]/30 hover:border-[#E50914]/60 transition-all text-center space-y-1">
-                        <div class="flex items-center justify-center gap-1.5 text-xs font-extrabold text-amber-300">
-                            <svg class="w-4 h-4 fill-amber-400" viewBox="0 0 24 24"><path d="M5 16L3 5l5.5 5L12 4l3.5 6L21 5l-2 11H5m14 3c0 .6-.4 1-1 1H6c-.6 0-1-.4-1-1v-1h14v1z"/></svg>
-                            <span>VIP Pas Tanpa Iklan</span>
-                        </div>
-                        <p class="text-[10px] text-slate-400">Tonton tanpa henti untuk hanya RM5/bulan</p>
-                    </a>
-                </div>
-            @endif
+            <!-- VIP Promotion Footer -->
+            <div class="pt-3 mt-3 border-t border-white/10 flex items-center justify-between text-xs">
+                <span class="text-slate-400 text-[11px]">Format 9:16 Pantas & Tanpa Gangguan</span>
+                <a href="/subscribe" class="text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1">
+                    <i data-lucide="crown" class="w-3.5 h-3.5"></i>
+                    <span>Pas VIP RM5</span>
+                </a>
+            </div>
+
         </div>
 
     </div>
 
-    <!-- Alpine.js Integrated Video & Interstitial Ad Engine -->
+    <!-- ======================================================== -->
+    <!-- DESKTOP ARROW NAVIGATION CONTROLS (OUTSIDE PHONE FRAME)  -->
+    <!-- ======================================================== -->
+    <div class="hidden lg:flex flex-col items-center gap-3 ml-8 z-10">
+        @if ($nextEpisode)
+            <button @click="goNext()"
+                    title="Episod Seterusnya (Swipe Up atau Scroll Down)"
+                    class="w-12 h-12 rounded-full bg-white/10 hover:bg-red-600 text-white flex items-center justify-center border border-white/20 shadow-xl hover:scale-110 transition-all">
+                <i data-lucide="chevron-up" class="w-6 h-6"></i>
+            </button>
+            <span class="text-[11px] font-bold text-slate-400">Ep {{ $nextEpisode->episode_number }}</span>
+        @endif
+
+        @if ($prevEpisode)
+            <button @click="goPrev()"
+                    title="Episod Sebelumnya (Swipe Down atau Scroll Up)"
+                    class="w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center border border-white/20 shadow-xl hover:scale-110 transition-all mt-4">
+                <i data-lucide="chevron-down" class="w-6 h-6"></i>
+            </button>
+            <span class="text-[11px] font-bold text-slate-400">Ep {{ $prevEpisode->episode_number }}</span>
+        @endif
+
+        <div class="text-[10px] text-slate-500 text-center mt-6 space-y-1">
+            <p>⌨ Navigasi:</p>
+            <p><kbd class="px-1 py-0.5 rounded bg-white/10 text-slate-300">↓</kbd> / <kbd class="px-1 py-0.5 rounded bg-white/10 text-slate-300">↑</kbd></p>
+            <p>atau Scroll Mouse</p>
+        </div>
+    </div>
+
+    <!-- Share Toast Notification -->
+    <div id="shareToast" 
+         class="fixed top-8 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full bg-neutral-900/90 text-white text-xs font-bold border border-white/20 shadow-2xl transition-opacity duration-300 opacity-0 pointer-events-none">
+        Pautan berjaya disalin ke papan keratan!
+    </div>
+
+    <!-- Alpine.js TikTok Drama Controller -->
     <script>
-        function episodePlayer(config) {
+        function tiktokDramaPlayer(config) {
             return {
-                episodeId: config.episodeId,
-                currentEpisodeNumber: config.currentEpisodeNumber,
-                nextEpisodeUrl: config.nextEpisodeUrl,
-                prevEpisodeUrl: config.prevEpisodeUrl,
+                dramaSlug: config.dramaSlug,
+                dramaTitle: config.dramaTitle,
+                currentEp: config.currentEpisodeNumber,
+                totalEpisodes: config.totalEpisodes,
+                nextUrl: config.nextUrl,
+                prevUrl: config.prevUrl,
                 nextEpisodeNumber: config.nextEpisodeNumber,
-                nextEpisodeTitle: config.nextEpisodeTitle || 'Episod Seterusnya',
-                youtubeVideoId: config.youtubeVideoId,
-                isPremium: config.isPremium,
-                hasAd: config.hasAd,
-                adDuration: config.adDuration || 15,
+                prevEpisodeNumber: config.prevEpisodeNumber,
+                youtubeId: config.youtubeId,
+                videoUrl: config.videoUrl,
+                isYouTube: config.isYouTube,
 
-                drawerOpen: false,
-                ytPlayer: null,
+                // State
+                episodeDrawerOpen: false,
+                liked: false,
+                likeCount: 12400 + Math.floor(Math.random() * 200),
+                startY: 0,
+                endY: 0,
+                isWheelThrottled: false,
 
-                // 2-Second Auto-Play Countdown (VIP)
-                showCountdownOverlay: false,
-                countdownSeconds: 2,
-                countdownInterval: null,
-
-                // Interstitial Ad Modal (Free Users)
-                showAdModal: false,
-                adCountdown: config.adDuration || 15,
-                adTimerInterval: null,
-                targetNextUrl: null,
-
-                // Touch Gestures
-                touchStartY: 0,
-                touchStartX: 0,
+                get likeCountFormatted() {
+                    return (this.likeCount / 1000).toFixed(1) + 'K';
+                },
 
                 init() {
-                    this.initYouTube();
-                },
-
-                initYouTube() {
-                    if (!this.youtubeVideoId) return;
-
-                    const mountYT = () => {
-                        if (window.YT && window.YT.Player) {
-                            this.ytPlayer = new YT.Player('ytPlayerFrame', {
-                                videoId: this.youtubeVideoId,
-                                playerVars: {
-                                    playsinline: 1,
-                                    rel: 0,
-                                    modestbranding: 1,
-                                    autoplay: 1,
-                                    controls: 1,
-                                    enablejsapi: 1,
-                                    fs: 1,
-                                    origin: window.location.origin
-                                },
-                                events: {
-                                    'onReady': (event) => {
-                                        event.target.playVideo();
-                                    },
-                                    'onStateChange': (event) => {
-                                        // Listen for YT.PlayerState.ENDED (0)
-                                        if (event.data === YT.PlayerState.ENDED) {
-                                            this.onVideoEnded();
-                                        }
-                                    }
-                                }
-                            });
-                        } else {
-                            setTimeout(mountYT, 100);
-                        }
-                    };
-
-                    mountYT();
-                },
-
-                // Video Ended Handler
-                onVideoEnded() {
-                    if (!this.nextEpisodeUrl) return;
-
-                    if (this.isPremium || !this.hasAd) {
-                        // VIP User: Auto advance with brief 2-second countdown
-                        this.startAutoPlayCountdown();
-                    } else {
-                        // Free User: Strict Rewarded Interstitial Ad Gate
-                        this.triggerNextEpisode(this.nextEpisodeUrl);
-                    }
-                },
-
-                startAutoPlayCountdown() {
-                    this.showCountdownOverlay = true;
-                    this.countdownSeconds = 2;
-                    clearInterval(this.countdownInterval);
-
-                    this.countdownInterval = setInterval(() => {
-                        this.countdownSeconds--;
-                        if (this.countdownSeconds <= 0) {
-                            clearInterval(this.countdownInterval);
-                            this.showCountdownOverlay = false;
-                            window.location.href = this.nextEpisodeUrl;
-                        }
-                    }, 1000);
-                },
-
-                cancelAutoPlay() {
-                    clearInterval(this.countdownInterval);
-                    this.showCountdownOverlay = false;
-                },
-
-                proceedNextImmediately() {
-                    clearInterval(this.countdownInterval);
-                    this.showCountdownOverlay = false;
-                    window.location.href = this.nextEpisodeUrl;
-                },
-
-                // Intercept Episode Clicks (Sidebar & Mobile Drawer)
-                handleEpisodeClick(targetUrl, targetEpNumber) {
-                    if (this.isPremium || !this.hasAd) {
-                        window.location.href = targetUrl;
-                        return;
-                    }
-
-                    // Free users clicking future episode: Must watch Ad first!
-                    if (targetEpNumber > this.currentEpisodeNumber) {
-                        this.drawerOpen = false;
-                        this.triggerNextEpisode(targetUrl);
-                    } else {
-                        // Current or previous episode can be watched freely
-                        window.location.href = targetUrl;
-                    }
-                },
-
-                // Trigger Interstitial Ad Modal
-                triggerNextEpisode(targetUrl) {
-                    if (this.isPremium || !this.hasAd) {
-                        window.location.href = targetUrl;
-                        return;
-                    }
-
-                    // Pause YouTube playback if playing
-                    if (this.ytPlayer && typeof this.ytPlayer.pauseVideo === 'function') {
-                        try { this.ytPlayer.pauseVideo(); } catch (e) {}
-                    }
-
-                    this.targetNextUrl = targetUrl;
-                    this.showAdModal = true;
-                    this.adCountdown = this.adDuration;
-
                     this.$nextTick(() => {
-                        const adVid = this.$refs.adVideoPlayer;
-                        if (adVid) {
-                            adVid.currentTime = 0;
-                            adVid.play().catch(() => {});
-                        }
+                        if (window.lucide) window.lucide.createIcons();
                     });
 
-                    clearInterval(this.adTimerInterval);
-                    this.adTimerInterval = setInterval(() => {
-                        this.adCountdown--;
-                        if (this.adCountdown <= 0) {
-                            clearInterval(this.adTimerInterval);
-                        }
-                    }, 1000);
-                },
-
-                skipAdAndPlayNext() {
-                    if (this.adCountdown > 0) return;
-                    clearInterval(this.adTimerInterval);
-                    const dest = this.targetNextUrl || this.nextEpisodeUrl;
-                    if (dest) {
-                        window.location.href = dest;
-                    } else {
-                        this.showAdModal = false;
+                    // Check if already liked in localStorage
+                    const likeKey = `liked_${this.dramaSlug}_ep_${this.currentEp}`;
+                    if (localStorage.getItem(likeKey) === 'true') {
+                        this.liked = true;
                     }
                 },
 
-                // Touch Swipe Handlers (Swipe Up -> Next Episode, Swipe Down -> Prev Episode)
-                onTouchStart(e) {
-                    this.touchStartY = e.touches[0].clientY;
-                    this.touchStartX = e.touches[0].clientX;
+                openEpisodeDrawer() {
+                    this.episodeDrawerOpen = true;
+                    this.$nextTick(() => {
+                        if (window.lucide) window.lucide.createIcons();
+                    });
                 },
 
-                onTouchEnd(e) {
-                    const deltaY = e.changedTouches[0].clientY - this.touchStartY;
-                    const deltaX = e.changedTouches[0].clientX - this.touchStartX;
+                toggleLike() {
+                    this.liked = !this.liked;
+                    const likeKey = `liked_${this.dramaSlug}_ep_${this.currentEp}`;
+                    if (this.liked) {
+                        this.likeCount++;
+                        localStorage.setItem(likeKey, 'true');
+                    } else {
+                        this.likeCount--;
+                        localStorage.removeItem(likeKey);
+                    }
+                },
 
-                    if (Math.abs(deltaY) > 60 && Math.abs(deltaY) > Math.abs(deltaX)) {
-                        if (deltaY < 0 && this.nextEpisodeUrl) {
-                            this.triggerNextEpisode(this.nextEpisodeUrl);
-                        } else if (deltaY > 0 && this.prevEpisodeUrl) {
-                            window.location.href = this.prevEpisodeUrl;
+                shareEpisode() {
+                    if (navigator.share) {
+                        navigator.share({
+                            title: this.dramaTitle + ' - Episod ' + this.currentEp,
+                            url: window.location.href
+                        }).catch(() => {});
+                    } else {
+                        navigator.clipboard.writeText(window.location.href);
+                        const toast = document.getElementById('shareToast');
+                        if (toast) {
+                            toast.classList.remove('opacity-0');
+                            setTimeout(() => toast.classList.add('opacity-0'), 2200);
+                        }
+                    }
+                },
+
+                // Gesture: Touch Swipe Up (Next) & Swipe Down (Prev)
+                handleTouchStart(e) {
+                    if (this.episodeDrawerOpen) return;
+                    this.startY = e.touches[0].clientY;
+                },
+
+                handleTouchMove(e) {
+                    if (this.episodeDrawerOpen) return;
+                    this.endY = e.touches[0].clientY;
+                },
+
+                handleTouchEnd(e) {
+                    if (this.episodeDrawerOpen) return;
+                    if (!this.startY || !this.endY) return;
+
+                    const deltaY = this.startY - this.endY;
+                    const minSwipeDistance = 60; // 60px swipe threshold
+
+                    if (deltaY > minSwipeDistance) {
+                        // Swiped UP -> Next Episode
+                        this.goNext();
+                    } else if (deltaY < -minSwipeDistance) {
+                        // Swiped DOWN -> Previous Episode
+                        this.goPrev();
+                    }
+
+                    this.startY = 0;
+                    this.endY = 0;
+                },
+
+                // Gesture: Mouse Wheel Scroll Up / Down
+                handleWheel(e) {
+                    if (this.episodeDrawerOpen || this.isWheelThrottled) return;
+
+                    if (e.deltaY > 50) {
+                        // Scroll DOWN -> Next Episode
+                        this.isWheelThrottled = true;
+                        this.goNext();
+                        setTimeout(() => { this.isWheelThrottled = false; }, 800);
+                    } else if (e.deltaY < -50) {
+                        // Scroll UP -> Previous Episode
+                        this.isWheelThrottled = true;
+                        this.goPrev();
+                        setTimeout(() => { this.isWheelThrottled = false; }, 800);
+                    }
+                },
+
+                // Keyboard Arrow Down / Up
+                handleKeyDown(e) {
+                    if (this.episodeDrawerOpen) {
+                        if (e.key === 'Escape') this.episodeDrawerOpen = false;
+                        return;
+                    }
+
+                    if (e.key === 'ArrowDown' || e.key === 'j' || e.key === 'J') {
+                        e.preventDefault();
+                        this.goNext();
+                    } else if (e.key === 'ArrowUp' || e.key === 'k' || e.key === 'K') {
+                        e.preventDefault();
+                        this.goPrev();
+                    }
+                },
+
+                goNext() {
+                    if (this.nextUrl) {
+                        window.location.href = this.nextUrl;
+                    } else {
+                        this.openEpisodeDrawer();
+                    }
+                },
+
+                goPrev() {
+                    if (this.prevUrl) {
+                        window.location.href = this.prevUrl;
+                    }
+                },
+
+                toggleDirectPlay() {
+                    const video = this.$refs.directVideo;
+                    if (video) {
+                        if (video.paused) {
+                            video.play();
+                        } else {
+                            video.pause();
                         }
                     }
                 }
-            }
+            };
         }
     </script>
 </body>

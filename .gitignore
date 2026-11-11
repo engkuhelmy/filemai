@@ -1,10 +1,26 @@
-# Composer
+# Composer & Dependencies
 composer.phar
 vendor/
+node_modules/
 
 # Environment / local configs
 .env
+.env.backup
+.env.production
 *.log
+
+# Laravel Storage & Cache
+storage/*.key
+storage/framework/cache/data/*
+!storage/framework/cache/data/.gitignore
+storage/framework/sessions/*
+!storage/framework/sessions/.gitignore
+storage/framework/views/*
+!storage/framework/views/.gitignore
+storage/logs/*
+!storage/logs/.gitignore
+bootstrap/cache/*.php
+!bootstrap/cache/.gitignore
 
 # Large media files
 uploads/videos/sample_reel.mp4
