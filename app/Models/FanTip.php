@@ -43,3 +43,4 @@ class FanTip extends Model
         return $this->belongsTo(Episode::class, 'episode_id');
     }
 }
+

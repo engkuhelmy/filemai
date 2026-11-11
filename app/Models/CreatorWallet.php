@@ -45,3 +45,4 @@ class CreatorWallet extends Model
         return max(0, (float)$this->current_balance - (float)$pendingPayouts);
     }
 }
+

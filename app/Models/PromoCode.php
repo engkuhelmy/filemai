@@ -42,3 +42,4 @@ class PromoCode extends Model
         return $this->belongsTo(Drama::class, 'drama_id');
     }
 }
+

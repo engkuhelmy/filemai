@@ -50,3 +50,4 @@ class CreatorSupportTicket extends Model
         };
     }
 }
+
