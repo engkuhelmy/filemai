@@ -13,8 +13,6 @@ class User extends Authenticatable
 {
     use HasFactory, Notifiable;
 
-    protected $table = 'users';
-
     protected $fillable = [
         'name',
         'email',
@@ -54,10 +52,12 @@ class User extends Authenticatable
 
     /**
      * Check if user has an active premium subscription.
+     * Admins automatically receive VIP ad-free privileges.
+     * Premium users must have subscription_status === 'premium' AND subscription_expires_at > now().
      */
     public function isPremium(): bool
     {
-        if ($this->role === 'admin') {
+        if ($this->isAdmin()) {
             return true;
         }
 
@@ -66,22 +66,14 @@ class User extends Authenticatable
         }
 
         if ($this->subscription_expires_at === null) {
-            return true;
+            return false;
         }
 
-        return Carbon::parse($this->subscription_expires_at)->isFuture();
+        return Carbon::now()->lt($this->subscription_expires_at);
     }
 
     /**
-     * Check if user is a creator or admin.
-     */
-    public function isCreator(): bool
-    {
-        return in_array($this->role, ['creator', 'admin']);
-    }
-
-    /**
-     * Check if user is a super admin.
+     * Check if user is Super Admin.
      */
     public function isAdmin(): bool
     {
@@ -89,7 +81,23 @@ class User extends Authenticatable
     }
 
     /**
-     * Dramas created by this user.
+     * Check if user is Content Creator.
+     */
+    public function isCreator(): bool
+    {
+        return in_array($this->role, ['creator', 'admin']);
+    }
+
+    /**
+     * Check if user is Regular Viewer.
+     */
+    public function isViewer(): bool
+    {
+        return $this->role === 'viewer';
+    }
+
+    /**
+     * Relationship: Dramas created by this user.
      */
     public function dramas(): HasMany
     {
@@ -109,13 +117,15 @@ class User extends Authenticatable
      */
     public function getOrCreateWallet(): CreatorWallet
     {
-        return $this->wallet ?: $this->wallet()->create([
-            'total_earned' => 0,
-            'total_withdrawn' => 0,
-            'current_balance' => 0,
-            'pending_balance' => 0,
-            'total_blocks' => 0,
-        ]);
+        return $this->wallet ?: CreatorWallet::forUser($this->id);
+    }
+
+    /**
+     * Alias for getOrCreateWallet().
+     */
+    public function getWallet(): CreatorWallet
+    {
+        return CreatorWallet::forUser($this->id);
     }
 
     /**

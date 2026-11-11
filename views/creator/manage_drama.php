@@ -96,6 +96,7 @@
 
             <form action="/creator/drama/<?= $drama['id'] ?>/episode/store" method="POST" enctype="multipart/form-data" class="space-y-4">
                 <input type="hidden" name="video_source" :value="videoSource">
+                <input type="hidden" name="video_type" :value="videoSource === 'youtube' ? 'youtube' : 'storage'">
 
                 <!-- Source Switcher Tabs -->
                 <div class="p-1 rounded-2xl bg-slate-950 border border-white/10 grid grid-cols-2 gap-1 text-xs font-bold">

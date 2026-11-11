@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS episodes (
     drama_id BIGINT UNSIGNED NOT NULL,
     episode_number INT NOT NULL,
     title VARCHAR(255) NOT NULL,
+    video_type ENUM('storage', 'youtube') NOT NULL DEFAULT 'storage',
     video_source ENUM('youtube', 'direct') NOT NULL DEFAULT 'youtube',
     youtube_video_id VARCHAR(20) NULL,
     video_url VARCHAR(500) NULL,

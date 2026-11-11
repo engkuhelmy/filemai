@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Drama;
 use App\Models\Episode;
+use App\Models\EpisodeView;
+use App\Models\CreatorWallet;
 use App\Models\Ad;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -12,12 +14,9 @@ use Carbon\Carbon;
 class EpisodeWatchController extends Controller
 {
     /**
-     * Display the 9:16 vertical video player and ad-gated interstitial theater.
-     *
-     * @param Drama $drama
-     * @param Episode $episode
-     * @param Request $request
-     * @return View
+     * Show the vertical video player for a specific episode of a drama.
+     * Enforces VIP ad-free logic, random active interstitial ad for free viewers,
+     * next episode auto-advancement, and episode playlist.
      */
     public function show(Drama $drama, Episode $episode, Request $request): View
     {
@@ -39,8 +38,14 @@ class EpisodeWatchController extends Controller
             }
         }
 
+        // Record real view event with device, browser, IP and user analytics
+        EpisodeView::recordView($drama, $episode, $request);
+
+        // Credit creator watch earnings per 1-minute block (e.g. RM 0.0001/block)
+        CreatorWallet::recordViewEarnings($drama, $episode);
+
         // Increment episode view count asynchronously (only if released or normal viewer)
-        if ($episode->status === 'published' || ($episode->status === 'scheduled' && $episode->scheduled_at && $episode->scheduled_at->isPast())) {
+        if ($episode->status === 'published' || ($episode->status === 'scheduled' && $episode->scheduled_at && $episode->scheduled_at->isPast()) || !$episode->status) {
             $episode->increment('views_count');
             $drama->increment('views_count');
         }
@@ -50,6 +55,7 @@ class EpisodeWatchController extends Controller
         if (!$isCreatorOrAdmin) {
             $episodesQuery->where(function ($q) {
                 $q->where('status', 'published')
+                  ->orWhereNull('status')
                   ->orWhere(function ($sq) {
                       $sq->where('status', 'scheduled')
                          ->whereNotNull('scheduled_at')
@@ -77,10 +83,7 @@ class EpisodeWatchController extends Controller
         // Fetch 1 random active interstitial ad if viewer is free/guest
         $ad = null;
         if (!$isPremium) {
-            $ad = Ad::getRandomActiveAd();
-            if ($ad) {
-                $ad->increment('views_count');
-            }
+            $ad = Ad::active()->inRandomOrder()->first();
         }
 
         return view('episodes.show', [
@@ -91,7 +94,7 @@ class EpisodeWatchController extends Controller
             'prevEpisode' => $prevEpisode,
             'isPremium' => $isPremium,
             'ad' => $ad,
-            'isCreatorPreview' => $isCreatorOrAdmin && ($episode->status !== 'published'),
+            'isCreatorPreview' => $isCreatorOrAdmin && ($episode->status !== 'published' && !empty($episode->status)),
             'title' => "Tonton {$episode->title} - {$drama->title} | Filemai",
         ]);
     }

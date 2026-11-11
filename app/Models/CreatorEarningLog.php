@@ -12,7 +12,7 @@ class CreatorEarningLog extends Model
 
     protected $table = 'creator_earning_logs';
 
-    public $timestamps = false; // Only created_at in schema
+    public $timestamps = false;
 
     protected $fillable = [
         'creator_id',
@@ -27,10 +27,16 @@ class CreatorEarningLog extends Model
         'created_at',
     ];
 
-    protected $casts = [
-        'amount' => 'decimal:4',
-        'created_at' => 'datetime',
-    ];
+    protected function casts(): array
+    {
+        return [
+            'duration_seconds' => 'integer',
+            'blocks_count' => 'integer',
+            'rate_per_block' => 'decimal:6',
+            'amount' => 'decimal:6',
+            'created_at' => 'datetime',
+        ];
+    }
 
     public function creator(): BelongsTo
     {
@@ -53,8 +59,7 @@ class CreatorEarningLog extends Model
             'paywall' => 'Jualan Episod (Paywall)',
             'season_pass' => 'Pakej Musim (Bundle)',
             'tip' => 'Tip / Hadiah Peminat',
-            default => 'Kongsi Hasil Iklan',
+            default => 'Kongsi Hasil Iklan (Tontonan Blok)',
         };
     }
 }
-

@@ -78,7 +78,7 @@ class EpisodeController extends Controller
     }
 
     /**
-     * Show form for creating a new episode.
+     * Show form for creating a new episode in this drama.
      */
     public function create(Drama $drama): View
     {
@@ -95,7 +95,7 @@ class EpisodeController extends Controller
     }
 
     /**
-     * Store newly created episode for the drama.
+     * Store newly created episode for the drama (direct storage MP4, YouTube, or Coming Soon).
      */
     public function store(StoreEpisodeRequest $request, Drama $drama): RedirectResponse
     {
@@ -106,58 +106,65 @@ class EpisodeController extends Controller
 
         $youtubeVideoId = null;
         $videoUrl = null;
-        $videoSource = 'direct';
+        $videoSource = 'youtube';
+        $isComingSoon = false;
 
-        if ($videoType === 'youtube') {
+        if ($videoType === 'coming_soon') {
+            $isComingSoon = true;
+            $videoSource = 'storage';
+        } elseif ($videoType === 'youtube') {
             $rawUrl = $validated['youtube_url'] ?? '';
             $youtubeVideoId = MediaHelper::extractYouTubeId($rawUrl);
-            $videoUrl = MediaHelper::cleanYouTubeUrl($rawUrl) ?? $rawUrl;
-            $videoSource = 'youtube';
+            if (!empty($youtubeVideoId)) {
+                $videoUrl = MediaHelper::cleanYouTubeUrl($rawUrl) ?? $rawUrl;
+                $videoSource = 'youtube';
+            } else {
+                $isComingSoon = true;
+            }
         } else {
             // Storage file upload or CDN URL
             if ($request->hasFile('video_file') && $request->file('video_file')->isValid()) {
                 $file = $request->file('video_file');
                 $ext = strtolower($file->getClientOriginalExtension());
                 $filename = 'ep_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
-
+                
                 $targetDir = public_path('uploads/videos');
                 if (!file_exists($targetDir)) {
                     @mkdir($targetDir, 0755, true);
                 }
-
+                
                 $file->move($targetDir, $filename);
                 $videoUrl = '/uploads/videos/' . $filename;
+                $videoSource = 'direct';
             } elseif (!empty($validated['video_url'])) {
                 $videoUrl = trim($validated['video_url']);
+                $videoSource = 'direct';
             } else {
-                $videoUrl = '/uploads/videos/sample_reel.mp4';
+                $isComingSoon = true;
+                $videoSource = 'direct';
+                $videoUrl = null;
             }
-
-            $videoSource = 'direct';
-            $youtubeVideoId = null;
         }
 
-        // Feature 4: Handle Custom Thumbnail Upload
+        // Handle custom thumbnail upload or URL
         $thumbnailUrl = null;
         if ($request->hasFile('thumbnail_file') && $request->file('thumbnail_file')->isValid()) {
             $thumbFile = $request->file('thumbnail_file');
             $thumbExt = strtolower($thumbFile->getClientOriginalExtension());
             $thumbFilename = 'thumb_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $thumbExt;
-
             $thumbDir = public_path('uploads/thumbnails');
             if (!file_exists($thumbDir)) {
                 @mkdir($thumbDir, 0755, true);
             }
-
             $thumbFile->move($thumbDir, $thumbFilename);
             $thumbnailUrl = '/uploads/thumbnails/' . $thumbFilename;
         } elseif (!empty($validated['thumbnail_url'])) {
             $thumbnailUrl = trim($validated['thumbnail_url']);
         }
 
-        // Feature 5: Status and Scheduled Date
-        $status = $validated['status'] ?? 'published';
+        // Schedule datetime parsing
         $scheduledAt = null;
+        $status = $validated['status'] ?? 'published';
         if ($status === 'scheduled' && !empty($validated['scheduled_at'])) {
             $scheduledAt = Carbon::parse($validated['scheduled_at']);
         }
@@ -167,7 +174,7 @@ class EpisodeController extends Controller
             'episode_number' => $validated['episode_number'],
             'title' => $validated['title'],
             'description' => $validated['description'] ?? null,
-            'video_type' => $videoType,
+            'video_type' => $isComingSoon ? 'storage' : $videoType,
             'video_source' => $videoSource,
             'youtube_video_id' => $youtubeVideoId,
             'video_url' => $videoUrl,
@@ -176,107 +183,159 @@ class EpisodeController extends Controller
             'status' => $status,
             'scheduled_at' => $scheduledAt,
             'is_free_preview' => $request->boolean('is_free_preview', false),
+            'is_coming_soon' => $isComingSoon,
+            'views_count' => 0,
         ]);
 
+        $statusMsg = $isComingSoon 
+            ? "Episod {$episode->episode_number} (\"{$episode->title}\") berjaya ditambah dengan status Coming Soon (Akan Datang)!" 
+            : "Episod {$episode->episode_number} (\"{$episode->title}\") berjaya ditambah dan diterbitkan!";
+
         return redirect()
-            ->route('creator.dramas.episodes.index', $drama)
-            ->with('success', "Episod {$episode->episode_number} (\"{$episode->title}\") berjaya ditambah!");
+            ->route('creator.dramas.manage', $drama)
+            ->with('success', $statusMsg);
     }
 
     /**
-     * Feature 2 & 3: Show form for editing an existing episode.
+     * Show form to edit an existing episode.
      */
     public function edit(Drama $drama, Episode $episode): View
     {
         $this->authorizeEpisode($drama, $episode);
+        $user = auth()->user();
 
         return view('creator.episodes.edit', [
             'drama' => $drama,
             'episode' => $episode,
+            'canEditTitle' => $episode->canEditTitle($user),
+            'remainingTime' => $episode->remainingEditTime(),
         ]);
     }
 
     /**
-     * Feature 2 & 3: Update existing episode metadata, media source, thumbnail, and visibility.
+     * Update an existing episode.
      */
-    public function update(UpdateEpisodeRequest $request, Drama $drama, Episode $episode): RedirectResponse
+    public function update(Request $request, Drama $drama, Episode $episode): RedirectResponse
     {
         $this->authorizeEpisode($drama, $episode);
+        $user = auth()->user();
+        $canEditTitle = $episode->canEditTitle($user);
 
-        $validated = $request->validated();
-        $videoTypeChoice = $validated['video_type'] ?? 'current';
+        $validated = $request->validate([
+            'title' => $canEditTitle ? 'required|string|max:255' : 'nullable|string|max:255',
+            'description' => 'nullable|string|max:2000',
+            'episode_number' => 'required|integer|min:1',
+            'video_type' => 'required|in:storage,youtube,coming_soon',
+            'youtube_url' => 'nullable|string',
+            'video_url' => 'nullable|string|max:500',
+            'video_file' => 'nullable|file|mimes:mp4,webm,mov,m4v|max:204800',
+            'thumbnail_file' => 'nullable|file|mimes:jpg,jpeg,png,webp|max:5120',
+            'thumbnail_url' => 'nullable|string|max:500',
+            'duration' => 'nullable|integer|min:1|max:7200',
+            'status' => 'nullable|in:draft,scheduled,published',
+            'scheduled_at' => 'nullable|date',
+            'is_free_preview' => 'nullable',
+        ], [
+            'title.required' => 'Tajuk episod wajib diisi.',
+            'episode_number.required' => 'Nombor episod wajib diisi.',
+        ]);
 
-        // Feature 3: Swap Media Source
-        if ($videoTypeChoice === 'youtube') {
+        // Enforce 24-hour title rule
+        $finalTitle = $episode->title;
+        $attemptedTitleChange = false;
+        if ($canEditTitle && !empty($validated['title'])) {
+            $finalTitle = trim($validated['title']);
+        } elseif (!$canEditTitle && $request->filled('title') && trim($request->input('title')) !== $episode->title) {
+            $attemptedTitleChange = true;
+        }
+
+        $videoType = $validated['video_type'];
+        $youtubeVideoId = null;
+        $videoUrl = null;
+        $videoSource = 'youtube';
+        $isComingSoon = false;
+
+        if ($videoType === 'coming_soon') {
+            $isComingSoon = true;
+            $videoSource = 'direct';
+        } elseif ($videoType === 'youtube') {
             $rawUrl = $validated['youtube_url'] ?? '';
-            $episode->video_type = 'youtube';
-            $episode->video_source = 'youtube';
-            $episode->youtube_video_id = MediaHelper::extractYouTubeId($rawUrl);
-            $episode->video_url = MediaHelper::cleanYouTubeUrl($rawUrl) ?? $rawUrl;
-        } elseif ($videoTypeChoice === 'storage') {
-            $episode->video_type = 'storage';
-            $episode->video_source = 'direct';
-            $episode->youtube_video_id = null;
-
+            $youtubeVideoId = MediaHelper::extractYouTubeId($rawUrl);
+            if (!empty($youtubeVideoId)) {
+                $videoUrl = MediaHelper::cleanYouTubeUrl($rawUrl) ?? $rawUrl;
+                $videoSource = 'youtube';
+            } else {
+                $isComingSoon = true;
+            }
+        } else {
             if ($request->hasFile('video_file') && $request->file('video_file')->isValid()) {
                 $file = $request->file('video_file');
                 $ext = strtolower($file->getClientOriginalExtension());
                 $filename = 'ep_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
-
                 $targetDir = public_path('uploads/videos');
                 if (!file_exists($targetDir)) {
                     @mkdir($targetDir, 0755, true);
                 }
-
                 $file->move($targetDir, $filename);
-                $episode->video_url = '/uploads/videos/' . $filename;
+                $videoUrl = '/uploads/videos/' . $filename;
+                $videoSource = 'direct';
             } elseif (!empty($validated['video_url'])) {
-                $episode->video_url = trim($validated['video_url']);
+                $videoUrl = trim($validated['video_url']);
+                $videoSource = 'direct';
+            } elseif (!empty($episode->video_url) && !$episode->isComingSoon()) {
+                $videoUrl = $episode->video_url;
+                $videoSource = 'direct';
+            } else {
+                $isComingSoon = true;
+                $videoSource = 'direct';
             }
         }
-        // If 'current', keep existing video fields intact
 
-        // Feature 4: Custom Thumbnail
-        if ($request->boolean('remove_custom_thumbnail')) {
-            $episode->thumbnail_url = null;
-        } elseif ($request->hasFile('thumbnail_file') && $request->file('thumbnail_file')->isValid()) {
+        // Thumbnail Handling
+        $thumbnailUrl = $episode->thumbnail_url;
+        if ($request->hasFile('thumbnail_file') && $request->file('thumbnail_file')->isValid()) {
             $thumbFile = $request->file('thumbnail_file');
             $thumbExt = strtolower($thumbFile->getClientOriginalExtension());
             $thumbFilename = 'thumb_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $thumbExt;
-
             $thumbDir = public_path('uploads/thumbnails');
             if (!file_exists($thumbDir)) {
                 @mkdir($thumbDir, 0755, true);
             }
-
             $thumbFile->move($thumbDir, $thumbFilename);
-            $episode->thumbnail_url = '/uploads/thumbnails/' . $thumbFilename;
+            $thumbnailUrl = '/uploads/thumbnails/' . $thumbFilename;
         } elseif (!empty($validated['thumbnail_url'])) {
-            $episode->thumbnail_url = trim($validated['thumbnail_url']);
+            $thumbnailUrl = trim($validated['thumbnail_url']);
         }
 
-        // Feature 2: Metadata (Title, Episode Number, Description, Duration)
-        $episode->episode_number = (int)$validated['episode_number'];
-        $episode->title = $validated['title'];
-        $episode->description = $validated['description'] ?? null;
-        $episode->duration = $validated['duration'] ?? $episode->duration ?? 60;
-
-        // Feature 5: Visibility Status & Scheduling
-        $episode->status = $validated['status'] ?? 'published';
-        if ($episode->status === 'scheduled' && !empty($validated['scheduled_at'])) {
-            $episode->scheduled_at = Carbon::parse($validated['scheduled_at']);
-        } elseif ($episode->status !== 'scheduled') {
-            $episode->scheduled_at = null;
+        // Schedule datetime
+        $scheduledAt = null;
+        $status = $validated['status'] ?? $episode->status ?? 'published';
+        if ($status === 'scheduled' && !empty($validated['scheduled_at'])) {
+            $scheduledAt = Carbon::parse($validated['scheduled_at']);
         }
 
-        // Feature 6: Paywall / Free Access Toggle
-        $episode->is_free_preview = $request->boolean('is_free_preview', false);
+        $episode->update([
+            'title' => $finalTitle,
+            'description' => $validated['description'] ?? $episode->description,
+            'episode_number' => $validated['episode_number'],
+            'video_type' => $isComingSoon ? 'storage' : $videoType,
+            'video_source' => $videoSource,
+            'youtube_video_id' => $youtubeVideoId,
+            'video_url' => $videoUrl,
+            'thumbnail_url' => $thumbnailUrl,
+            'duration' => $validated['duration'] ?? ($episode->duration ?? 60),
+            'status' => $status,
+            'scheduled_at' => $scheduledAt,
+            'is_free_preview' => $request->boolean('is_free_preview'),
+            'is_coming_soon' => $isComingSoon,
+        ]);
 
-        $episode->save();
+        $statusText = $isComingSoon ? 'Akan Datang (Coming Soon)' : 'Telah Diterbitkan dengan Video';
+        $notice = $attemptedTitleChange ? " (Perhatian: Tajuk episod tidak diubah kerana peraturan 24 jam telah tamat)" : "";
 
         return redirect()
-            ->route('creator.dramas.episodes.index', $drama)
-            ->with('success', "Episod {$episode->episode_number} (\"{$episode->title}\") berjaya dikemaskini!");
+            ->route('creator.dramas.manage', $drama)
+            ->with('success', "Episod {$episode->episode_number} (\"{$episode->title}\") berjaya dikemaskini [Status: {$statusText}]{$notice}!");
     }
 
     /**
@@ -285,17 +344,15 @@ class EpisodeController extends Controller
     public function destroy(Drama $drama, Episode $episode): RedirectResponse
     {
         $this->authorizeEpisode($drama, $episode);
-
-        $epNum = $episode->episode_number;
         $episode->delete();
 
         return redirect()
-            ->route('creator.dramas.episodes.index', $drama)
-            ->with('success', "Episod #{$epNum} berjaya dipadam.");
+            ->route('creator.dramas.manage', $drama)
+            ->with('success', 'Episod berjaya dipadam.');
     }
 
     /**
-     * Feature 6: Quick Toggle Free / VIP Access (One-click toggle).
+     * Feature 6: Quick Toggle Free/VIP Access.
      */
     public function toggleFree(Request $request, Drama $drama, Episode $episode): JsonResponse|RedirectResponse
     {
@@ -384,14 +441,12 @@ class EpisodeController extends Controller
 
         // Update sequentially within a transaction
         DB::transaction(function () use ($order, $drama) {
-            // First pass: shift numbers by high offset to avoid unique constraint collisions
             foreach ($order as $index => $id) {
                 Episode::where('id', $id)
                     ->where('drama_id', $drama->id)
                     ->update(['episode_number' => 10000 + $index + 1]);
             }
 
-            // Second pass: set sequential 1, 2, 3...
             foreach ($order as $index => $id) {
                 Episode::where('id', $id)
                     ->where('drama_id', $drama->id)

@@ -47,8 +47,13 @@ class WatchController
             }
         }
 
+        // Determine if video source is YouTube or Direct Storage
+        $isYouTube = ($episode['video_type'] ?? '') === 'youtube' 
+            || ($episode['video_source'] ?? '') === 'youtube'
+            || \App\Helpers\MediaHelper::isYouTube($episode['video_url'] ?? '');
+        $isDirect = !$isYouTube;
+
         // Attach HLS stream ONLY if the episode specifically uses an .m3u8 URL or has an episode-specific HLS file
-        $isDirect = ($episode['video_source'] ?? 'direct') === 'direct';
         $episode['hls_url'] = null;
         if ($isDirect && !empty($episode['video_url']) && str_ends_with(strtolower($episode['video_url']), '.m3u8')) {
             $episode['hls_url'] = $episode['video_url'];
@@ -60,16 +65,16 @@ class WatchController
         }
 
         if ($nextEpisode) {
-            $nextIsDirect = ($nextEpisode['video_source'] ?? 'direct') === 'direct';
+            $nextIsDirect = ($nextEpisode['video_type'] ?? '') !== 'youtube' && ($nextEpisode['video_source'] ?? 'direct') === 'direct';
             $nextEpisode['hls_url'] = ($nextIsDirect && !empty($nextEpisode['video_url']) && str_ends_with(strtolower($nextEpisode['video_url']), '.m3u8')) ? $nextEpisode['video_url'] : null;
         }
         if ($prevEpisode) {
-            $prevIsDirect = ($prevEpisode['video_source'] ?? 'direct') === 'direct';
+            $prevIsDirect = ($prevEpisode['video_type'] ?? '') !== 'youtube' && ($prevEpisode['video_source'] ?? 'direct') === 'direct';
             $prevEpisode['hls_url'] = ($prevIsDirect && !empty($prevEpisode['video_url']) && str_ends_with(strtolower($prevEpisode['video_url']), '.m3u8')) ? $prevEpisode['video_url'] : null;
         }
 
         // Attach video poster / thumbnail
-        if (($episode['video_source'] ?? '') === 'youtube' && !empty($episode['youtube_video_id'])) {
+        if ($isYouTube && !empty($episode['youtube_video_id'])) {
             $episode['poster_url'] = "https://img.youtube.com/vi/{$episode['youtube_video_id']}/hqdefault.jpg";
         } else {
             $epThumb = dirname(__DIR__, 2) . '/uploads/posters/ep' . $episode['id'] . '_thumb.jpg';

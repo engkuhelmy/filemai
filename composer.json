@@ -1,9 +1,15 @@
 {
-    "$schema": "https://getcomposer.org/schema.json",
     "name": "engkuhelmy/filemai",
     "type": "project",
     "description": "Filemai.my - Vertical mini-drama streaming platform with YouTube episode module & interstitial ad-gated player.",
-    "keywords": ["laravel", "framework", "streaming", "drama", "youtube", "interstitial-ads"],
+    "keywords": [
+        "laravel",
+        "framework",
+        "streaming",
+        "drama",
+        "youtube",
+        "interstitial-ads"
+    ],
     "license": "proprietary",
     "require": {
         "php": "^8.2",
@@ -17,7 +23,12 @@
     "config": {
         "optimize-autoloader": true,
         "preferred-install": "dist",
-        "sort-packages": true
+        "sort-packages": true,
+        "policy": {
+            "advisories": {
+                "block": false
+            }
+        }
     },
     "minimum-stability": "stable",
     "prefer-stable": true
