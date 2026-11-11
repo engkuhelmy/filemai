@@ -194,15 +194,22 @@
 
                 <!-- Creator & Social Links Bar (Ciri 3 & Ciri 13) -->
                 <div class="pt-4 border-t border-white/10 flex flex-wrap items-center justify-between gap-4 text-xs text-slate-400">
-                    <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-full bg-white/10 border border-white/15 flex items-center justify-center font-black text-white shrink-0">
-                            {{ strtoupper(substr($drama->creator->name ?? 'C', 0, 1)) }}
+                    <a href="{{ route('creator.public-profile', $drama->creator_id ?? 2) }}" class="flex items-center gap-3 group hover:opacity-90 transition">
+                        <div class="w-10 h-10 rounded-full bg-white/10 border border-white/15 overflow-hidden flex items-center justify-center font-black text-white shrink-0 group-hover:border-red-500/50 transition">
+                            @if($drama->creator && $drama->creator->avatar_url)
+                                <img src="{{ $drama->creator->avatar_url }}" alt="{{ $drama->creator->name }}" class="w-full h-full object-cover">
+                            @else
+                                {{ strtoupper(substr($drama->creator->name ?? 'C', 0, 1)) }}
+                            @endif
                         </div>
                         <div>
                             <span class="block text-slate-500 text-[10px]">Dicipta &amp; Diterbitkan Oleh</span>
-                            <span class="text-white font-bold">{{ $drama->creator->name ?? 'Pencipta Filemai' }}</span>
+                            <span class="text-white font-bold group-hover:text-red-400 transition-colors flex items-center gap-1">
+                                {{ $drama->creator->name ?? 'Pencipta Filemai' }}
+                                <i data-lucide="external-link" class="w-3 h-3 text-slate-500"></i>
+                            </span>
                         </div>
-                    </div>
+                    </a>
 
                     <!-- Social Links (Ciri 13) -->
                     @php
@@ -268,8 +275,12 @@
             <p class="text-xs text-slate-300 leading-relaxed">
                 {{ $drama->creator_bio ?: 'Pencipta berbakat tempatan yang menghasilkan karya mini drama berformat menegak di platform Filemai.my.' }}
             </p>
-            <div class="pt-2">
+            <div class="pt-3 border-t border-white/10 flex items-center justify-between">
                 <span class="text-[11px] text-slate-500">Karya rasmi: <strong>{{ $drama->title }}</strong></span>
+                <a href="{{ route('creator.public-profile', $drama->creator_id ?? 2) }}" class="text-xs font-bold text-red-400 hover:text-red-300 flex items-center gap-1 transition-colors">
+                    <span>Lihat Profil</span>
+                    <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                </a>
             </div>
         </div>
 
@@ -370,3 +381,4 @@
 
 </div>
 @endsection
+

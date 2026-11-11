@@ -238,3 +238,4 @@ class DramaController extends Controller
             ->with('success', "Butiran siri drama \"{$drama->title}\" berjaya dikemaskini sepenuhnya!");
     }
 }
+

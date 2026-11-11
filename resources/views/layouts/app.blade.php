@@ -72,7 +72,7 @@
                     <a href="{{ route('home') }}" class="hover:text-white transition-colors {{ request()->routeIs('home') ? 'text-white font-bold' : '' }}">Utama</a>
                     <a href="/?tab=trends" class="hover:text-white transition-colors">Trending</a>
                     <a href="/?tab=popular" class="hover:text-white transition-colors">Popular</a>
-                    <a href="{{ route('creator.dramas.manage', 1) }}" class="hover:text-white text-slate-400 hover:text-white transition-colors {{ request()->routeIs('creator.*') ? 'text-white font-bold' : '' }}">Studio Creator</a>
+                    <a href="{{ route('creator.dashboard') }}" class="hover:text-white text-slate-400 transition-colors {{ request()->routeIs('creator.*') ? 'text-white font-bold' : '' }}">Studio Creator</a>
                 </nav>
             </div>
 
@@ -85,7 +85,7 @@
                 </button>
 
                 <!-- Creator Studio Button -->
-                <a href="{{ route('creator.dramas.manage', 1) }}" class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-xs font-bold text-white transition-colors border border-white/10">
+                <a href="{{ route('creator.dashboard') }}" class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-xs font-bold text-white transition-colors border border-white/10">
                     <i data-lucide="video" class="w-4 h-4 text-red-500"></i>
                     <span>Studio Creator</span>
                 </a>
@@ -124,7 +124,7 @@
             <i data-lucide="trending-up" class="w-5 h-5"></i>
             <span>Trending</span>
         </a>
-        <a href="{{ route('creator.dramas.manage', 1) }}" class="flex flex-col items-center gap-1 {{ request()->routeIs('creator.*') ? 'text-[#E50914]' : 'hover:text-white' }}">
+        <a href="{{ route('creator.dashboard') }}" class="flex flex-col items-center gap-1 {{ request()->routeIs('creator.*') ? 'text-[#E50914]' : 'hover:text-white' }}">
             <i data-lucide="video" class="w-5 h-5"></i>
             <span>Creator</span>
         </a>

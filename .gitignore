@@ -1,6 +1,7 @@
 # Composer & Dependencies
 composer.phar
 vendor/
+vendor
 node_modules/
 
 # Environment / local configs

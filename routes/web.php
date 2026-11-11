@@ -6,6 +6,7 @@ use App\Models\Drama;
 use App\Models\Episode;
 use App\Http\Controllers\EpisodeWatchController;
 use App\Http\Controllers\Creator\EpisodeController as CreatorEpisodeController;
+use App\Http\Controllers\Creator\StudioHubController;
 use App\Http\Controllers\AuthController;
 
 /*
@@ -120,6 +121,37 @@ Route::get('/watch/{episode}', function (Episode $episode) {
 // Creator Studio Episode Management (Protected by auth & creator middleware)
 Route::middleware(['auth'])->prefix('creator')->name('creator.')->group(function () {
     
+    // Ciri 1 - 15: Creator Studio Hub & Monetization Dashboard
+    Route::get('/', [StudioHubController::class, 'dashboard'])->name('dashboard');
+    Route::get('/dashboard', [StudioHubController::class, 'dashboard'])->name('hub');
+
+    // Ciri 6 & 7: Kemaskini Profil & Media Sosial
+    Route::post('/profile', [StudioHubController::class, 'updateProfile'])->name('profile.update');
+
+    // Ciri 3: Tetapan Akaun Bank
+    Route::post('/bank', [StudioHubController::class, 'updateBank'])->name('bank.update');
+
+    // Ciri 1 & 3: Tuntutan Payout
+    Route::post('/wallet/payout', [StudioHubController::class, 'requestPayout'])->name('wallet.payout');
+
+    // Ciri 5: Eksport Penyata Kewangan (CSV)
+    Route::get('/wallet/export', [StudioHubController::class, 'exportTransactions'])->name('wallet.export');
+
+    // Ciri 11: Penjanaan Kod Promosi
+    Route::post('/promos', [StudioHubController::class, 'storePromoCode'])->name('promos.store');
+    Route::delete('/promos/{promoCode}', [StudioHubController::class, 'deletePromoCode'])->name('promos.destroy');
+
+    // Ciri 10: Pengurusan Komen Komuniti (Balas & Padam)
+    Route::post('/comments/{comment}/reply', [StudioHubController::class, 'replyComment'])->name('comments.reply');
+    Route::delete('/comments/{comment}', [StudioHubController::class, 'deleteComment'])->name('comments.destroy');
+
+    // Ciri 14: Pengurusan Pasukan
+    Route::post('/team', [StudioHubController::class, 'storeTeamMember'])->name('team.store');
+    Route::delete('/team/{member}', [StudioHubController::class, 'deleteTeamMember'])->name('team.destroy');
+
+    // Ciri 15: Tiket Sokongan & DMCA/Laporan Pelanggaran
+    Route::post('/tickets', [StudioHubController::class, 'storeSupportTicket'])->name('tickets.store');
+
     // Feature 1: Drama Episode Dashboard
     Route::get('/dramas/{drama}', [CreatorEpisodeController::class, 'index'])
         ->name('dramas.manage');
@@ -162,6 +194,10 @@ Route::middleware(['auth'])->prefix('creator')->name('creator.')->group(function
     Route::delete('/dramas/{drama}/episodes/{episode}', [CreatorEpisodeController::class, 'destroy'])
         ->name('dramas.episodes.destroy');
 });
+
+// Public Creator Profile Showcase & Fan Tipping (Ciri 6, 7, 9, 12)
+Route::get('/creator/profile/{user}', [StudioHubController::class, 'publicProfile'])->name('creator.public-profile');
+Route::post('/creator/profile/{user}/tip', [StudioHubController::class, 'submitFanTip'])->name('creator.tip.submit');
 
 // Authentication Routes
 Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
