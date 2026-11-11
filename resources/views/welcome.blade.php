@@ -196,6 +196,9 @@
                                 <span class="px-2 py-0.5 rounded text-[10px] font-black bg-[#E50914] text-white">
                                     {{ $drama->genre }}
                                 </span>
+                                <span class="px-1.5 py-0.5 rounded text-[9px] font-extrabold border backdrop-blur-md {{ $drama->type_badge['badge'] }}">
+                                    {{ $drama->type_badge['label'] }}
+                                </span>
                             </div>
 
                             <div class="absolute top-2 right-2">

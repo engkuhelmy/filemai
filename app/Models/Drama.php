@@ -224,4 +224,50 @@ class Drama extends Model
         }
         return Str::limit(strip_tags($this->synopsis ?? ''), 160, '...');
     }
+
+    /**
+     * Format Kandungan (Tagging: Drama, Short Film, Filem)
+     * Normalized type string.
+     */
+    public function getEffectiveTypeAttribute(): string
+    {
+        return match(strtolower($this->type ?? '')) {
+            'short_film' => 'short_film',
+            'film', 'movie' => 'film',
+            default => 'drama',
+        };
+    }
+
+    /**
+     * Format Kandungan Badge metadata & visual tags.
+     */
+    public function getTypeBadgeAttribute(): array
+    {
+        return match($this->effective_type) {
+            'short_film' => [
+                'type' => 'short_film',
+                'label' => 'Short Film',
+                'full_label' => 'Short Film (Filem Pendek)',
+                'badge' => 'bg-purple-500/20 text-purple-300 border-purple-500/40',
+                'dot' => 'bg-purple-400',
+                'icon' => 'film',
+            ],
+            'film' => [
+                'type' => 'film',
+                'label' => 'Filem',
+                'full_label' => 'Filem (Berdurasi Penuh)',
+                'badge' => 'bg-amber-500/20 text-amber-300 border-amber-500/40',
+                'dot' => 'bg-amber-400',
+                'icon' => 'clapperboard',
+            ],
+            default => [
+                'type' => 'drama',
+                'label' => 'Drama',
+                'full_label' => 'Drama (Siri Episod)',
+                'badge' => 'bg-red-500/20 text-red-300 border-red-500/40',
+                'dot' => 'bg-red-400',
+                'icon' => 'tv',
+            ],
+        };
+    }
 }

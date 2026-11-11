@@ -139,9 +139,14 @@
                         <a href="{{ route('drama.show', $drama->slug) }}" class="group rounded-2xl overflow-hidden bg-slate-900 border border-white/10 hover:border-red-500/50 transition-all hover:scale-[1.02] shadow-xl flex flex-col">
                             <div class="w-full aspect-[9/16] bg-black/60 overflow-hidden relative">
                                 <img src="{{ $drama->poster_url }}" alt="{{ $drama->title }}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">
-                                <span class="absolute top-2 left-2 px-2 py-0.5 rounded text-[10px] font-black uppercase text-white bg-red-600/90 shadow">
-                                    {{ $drama->genre }}
-                                </span>
+                                <div class="absolute top-2 left-2 flex flex-col gap-1 items-start">
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-black uppercase text-white bg-red-600/90 shadow">
+                                        {{ $drama->genre }}
+                                    </span>
+                                    <span class="px-2 py-0.5 rounded text-[9px] font-extrabold border shadow backdrop-blur-md {{ $drama->type_badge['badge'] }}">
+                                        {{ $drama->type_badge['label'] }}
+                                    </span>
+                                </div>
                             </div>
                             <div class="p-3 flex-1 flex flex-col justify-between">
                                 <h4 class="text-xs font-bold text-white group-hover:text-red-400 transition-colors line-clamp-1">

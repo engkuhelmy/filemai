@@ -75,10 +75,13 @@
                     <img src="{{ $drama->poster_url }}" alt="{{ $drama->title }}" 
                          class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
                     
-                    <!-- Genre Badge -->
+                    <!-- Genre & Format Badge -->
                     <div class="absolute top-3 left-3 flex flex-col gap-1.5">
                         <span class="px-2.5 py-1 rounded text-xs font-black text-white drama-bg-accent shadow-lg">
                             {{ $drama->genre }}
+                        </span>
+                        <span class="px-2 py-0.5 rounded text-[10px] font-extrabold border shadow-lg {{ $drama->type_badge['badge'] }}">
+                            {{ $drama->type_badge['label'] }}
                         </span>
                         <span class="px-2 py-0.5 rounded text-[10px] font-black bg-black/80 text-white border border-white/20">
                             {{ $drama->age_rating ?? '13+' }}
@@ -105,6 +108,12 @@
                             9:16 Sinematik Menegak
                         </span>
                         
+                        <!-- Format Kandungan Tag (Drama, Short Film, Filem) -->
+                        <span class="px-2.5 py-0.5 rounded-full font-extrabold border flex items-center gap-1 {{ $drama->type_badge['badge'] }}">
+                            <i data-lucide="{{ $drama->type_badge['icon'] }}" class="w-3.5 h-3.5"></i>
+                            <span>{{ $drama->type_badge['full_label'] }}</span>
+                        </span>
+
                         <!-- Release Status Badge (Ciri 7) -->
                         <span class="px-2.5 py-0.5 rounded-full font-bold {{ $drama->release_status_badge['badge'] }}">
                             {{ $drama->release_status_badge['label'] }}

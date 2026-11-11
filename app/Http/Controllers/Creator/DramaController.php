@@ -69,6 +69,9 @@ class DramaController extends Controller
             'title' => ['required', 'string', 'max:255'],
             'slug' => ['nullable', 'string', 'max:255', 'unique:dramas,slug,' . $drama->id],
 
+            // Format Kandungan (Tagging: Drama, Short Film, Filem)
+            'type' => ['required', 'string', 'in:drama,series,short_film,film,movie'],
+
             // 5. Sinopsis Penuh
             'synopsis' => ['nullable', 'string'],
 
@@ -120,6 +123,7 @@ class DramaController extends Controller
             'accent_color' => ['nullable', 'string', 'max:30'],
         ], [
             'title.required' => 'Tajuk siri drama wajib diisi.',
+            'type.required' => 'Sila pilih format rasmi karya (Drama, Short Film, atau Filem).',
             'slug.unique' => 'Slug URL ini telah digunakan oleh drama lain.',
             'poster_file.max' => 'Saiz poster maksimum ialah 5MB.',
             'banner_file.max' => 'Saiz banner maksimum ialah 8MB.',
@@ -132,6 +136,15 @@ class DramaController extends Controller
             $drama->slug = Str::slug($validated['slug']);
         } elseif (empty($drama->slug)) {
             $drama->slug = Str::slug($validated['title']);
+        }
+
+        // Format Kandungan (Tagging: Drama, Short Film, Filem)
+        if (!empty($validated['type'])) {
+            $drama->type = match(strtolower($validated['type'])) {
+                'short_film' => 'short_film',
+                'film', 'movie' => 'film',
+                default => 'drama',
+            };
         }
 
         // 5. Synopsis

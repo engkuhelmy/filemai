@@ -7,6 +7,7 @@
     title: '{{ addslashes(old('title', $drama->title)) }}',
     slug: '{{ addslashes(old('slug', $drama->slug)) }}',
     accentColor: '{{ old('accent_color', $drama->effective_accent_color) }}',
+    contentFormat: '{{ old('type', $drama->effective_type ?? 'drama') }}',
     releaseStatus: '{{ old('release_status', $drama->release_status ?? 'ongoing') }}',
     ageRating: '{{ old('age_rating', $drama->age_rating ?? '13+') }}',
     trailerUrl: '{{ old('trailer_url', $drama->trailer_url ?? '') }}',
@@ -79,6 +80,10 @@
                         <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider text-white border border-white/20"
                               :style="`background-color: ${accentColor}40`">
                             Studio Creator • 14 Ciri Pengurusan Drama
+                        </span>
+                        <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border transition-colors"
+                              :class="contentFormat === 'short_film' ? 'bg-purple-500/30 text-purple-300 border-purple-400/50' : (contentFormat === 'film' ? 'bg-amber-500/30 text-amber-300 border-amber-400/50' : 'bg-red-500/30 text-red-300 border-red-400/50')"
+                              x-text="contentFormat === 'short_film' ? '🎬 Short Film' : (contentFormat === 'film' ? '🎥 Filem' : '📺 Drama (Siri)')">
                         </span>
                         <span class="text-xs text-slate-400">• ID Siri: #{{ $drama->id }}</span>
                     </div>
@@ -153,6 +158,81 @@
                                    placeholder="jodoh-kontrak-ceo-dingin" 
                                    class="w-full bg-slate-950 text-white text-sm pl-36 pr-4 py-3 rounded-2xl border border-white/10 focus:outline-none focus:border-red-500 font-mono text-xs">
                         </div>
+                    </div>
+                </div>
+
+                <!-- Format Kandungan (Tagging: Drama, Short Film, Filem) -->
+                <div class="space-y-3 pt-2">
+                    <label for="type" class="block text-xs font-bold text-slate-300 flex items-center justify-between">
+                        <span class="flex items-center gap-1.5">
+                            <i data-lucide="tag" class="w-4 h-4 text-red-500"></i>
+                            Format Kandungan (*Content Format / Tagging*) <span class="text-red-500">*</span>
+                        </span>
+                        <span class="text-[11px] text-slate-400 font-normal">Pilih format rasmi karya untuk katalog &amp; penstriman</span>
+                    </label>
+
+                    <!-- Interactive Format Cards Selector -->
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <label class="p-3.5 rounded-2xl border cursor-pointer transition-all flex items-start gap-3"
+                               :class="contentFormat === 'drama' ? 'bg-red-950/40 border-red-500 text-white shadow-lg ring-1 ring-red-500/50' : 'bg-slate-950/60 border-white/10 text-slate-400 hover:border-white/20'">
+                            <input type="radio" name="type_radio" value="drama" x-model="contentFormat" class="sr-only">
+                            <div class="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
+                                 :class="contentFormat === 'drama' ? 'bg-red-600 text-white' : 'bg-white/5 text-slate-400'">
+                                <i data-lucide="tv" class="w-4 h-4"></i>
+                            </div>
+                            <div class="min-w-0">
+                                <div class="text-xs font-bold flex items-center gap-1.5">
+                                    <span>Drama</span>
+                                    <span class="px-1.5 py-0.5 rounded text-[9px] bg-red-500/20 text-red-300 font-black">Siri</span>
+                                </div>
+                                <p class="text-[10px] text-slate-400 mt-0.5">Siri berbilang episod menegak (9:16)</p>
+                            </div>
+                        </label>
+
+                        <label class="p-3.5 rounded-2xl border cursor-pointer transition-all flex items-start gap-3"
+                               :class="contentFormat === 'short_film' ? 'bg-purple-950/40 border-purple-500 text-white shadow-lg ring-1 ring-purple-500/50' : 'bg-slate-950/60 border-white/10 text-slate-400 hover:border-white/20'">
+                            <input type="radio" name="type_radio" value="short_film" x-model="contentFormat" class="sr-only">
+                            <div class="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
+                                 :class="contentFormat === 'short_film' ? 'bg-purple-600 text-white' : 'bg-white/5 text-slate-400'">
+                                <i data-lucide="film" class="w-4 h-4"></i>
+                            </div>
+                            <div class="min-w-0">
+                                <div class="text-xs font-bold flex items-center gap-1.5">
+                                    <span>Short Film</span>
+                                    <span class="px-1.5 py-0.5 rounded text-[9px] bg-purple-500/20 text-purple-300 font-black">Pendek</span>
+                                </div>
+                                <p class="text-[10px] text-slate-400 mt-0.5">Filem pendek episod tunggal / ringkas</p>
+                            </div>
+                        </label>
+
+                        <label class="p-3.5 rounded-2xl border cursor-pointer transition-all flex items-start gap-3"
+                               :class="contentFormat === 'film' ? 'bg-amber-950/40 border-amber-500 text-white shadow-lg ring-1 ring-amber-500/50' : 'bg-slate-950/60 border-white/10 text-slate-400 hover:border-white/20'">
+                            <input type="radio" name="type_radio" value="film" x-model="contentFormat" class="sr-only">
+                            <div class="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
+                                 :class="contentFormat === 'film' ? 'bg-amber-600 text-white' : 'bg-white/5 text-slate-400'">
+                                <i data-lucide="clapperboard" class="w-4 h-4"></i>
+                            </div>
+                            <div class="min-w-0">
+                                <div class="text-xs font-bold flex items-center gap-1.5">
+                                    <span>Filem</span>
+                                    <span class="px-1.5 py-0.5 rounded text-[9px] bg-amber-500/20 text-amber-300 font-black">Penuh</span>
+                                </div>
+                                <p class="text-[10px] text-slate-400 mt-0.5">Karya filem berdurasi penuh (*Feature Film*)</p>
+                            </div>
+                        </label>
+                    </div>
+
+                    <!-- Dropdown Pilihan Format Kandungan (Official Dropdown Input) -->
+                    <div class="space-y-1">
+                        <select id="type" 
+                                name="type" 
+                                x-model="contentFormat"
+                                class="w-full bg-slate-950 text-white text-xs px-4 py-3 rounded-2xl border border-white/10 focus:outline-none focus:border-red-500 font-semibold cursor-pointer">
+                            <option value="drama" {{ old('type', $drama->effective_type ?? $drama->type) === 'drama' || old('type', $drama->type) === 'series' ? 'selected' : '' }}>📺 Drama (Siri Episod Menegak)</option>
+                            <option value="short_film" {{ old('type', $drama->type) === 'short_film' ? 'selected' : '' }}>🎬 Short Film (Filem Pendek)</option>
+                            <option value="film" {{ old('type', $drama->type) === 'film' || old('type', $drama->type) === 'movie' ? 'selected' : '' }}>🎥 Filem (Berdurasi Penuh / Film)</option>
+                        </select>
+                        <p class="text-[11px] text-slate-500">Tag ini akan dipaparkan secara rasmi pada halaman katalog, poster utama, dan laman profil pencipta.</p>
                     </div>
                 </div>
 

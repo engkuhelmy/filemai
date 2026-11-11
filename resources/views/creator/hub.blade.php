@@ -487,9 +487,14 @@
                                 <img src="{{ $d->poster_url }}" alt="{{ $d->title }}" class="w-full h-full object-cover">
                             </div>
                             <div class="min-w-0 flex-1 space-y-1">
-                                <span class="px-2 py-0.5 rounded text-[10px] font-black uppercase text-red-400 bg-red-600/20 border border-red-500/30">
-                                    {{ $d->genre }}
-                                </span>
+                                <div class="flex items-center gap-1.5 flex-wrap">
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-black uppercase text-red-400 bg-red-600/20 border border-red-500/30">
+                                        {{ $d->genre }}
+                                    </span>
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-extrabold border {{ $d->type_badge['badge'] }}">
+                                        {{ $d->type_badge['label'] }}
+                                    </span>
+                                </div>
                                 <h4 class="text-sm font-bold text-white truncate">{{ $d->title }}</h4>
                                 <div class="text-[11px] text-slate-400">
                                     <span>{{ $d->episodes_count }} Episod</span> • <span>{{ number_format($d->views_count) }} Views</span>
