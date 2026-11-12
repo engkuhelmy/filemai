@@ -105,6 +105,13 @@ class EpisodeWatchController extends Controller
             $ad = Ad::active()->inRandomOrder()->first();
         }
 
+        // Resume playback progress tracking
+        $progress = \App\Models\PlaybackProgress::getProgress(
+            $episode->id,
+            $user?->id,
+            session()->getId()
+        );
+
         return view('episodes.show', [
             'drama' => $drama,
             'episode' => $episode,
@@ -113,6 +120,7 @@ class EpisodeWatchController extends Controller
             'prevEpisode' => $prevEpisode,
             'isPremium' => $isPremium,
             'ad' => $ad,
+            'progress' => $progress,
             'isCreatorPreview' => $isCreatorOrAdmin && ($episode->status !== 'published' && !empty($episode->status)),
             'title' => "Tonton {$episode->title} - {$drama->title} | Filemai",
         ]);

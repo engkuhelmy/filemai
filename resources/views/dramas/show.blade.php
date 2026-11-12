@@ -179,6 +179,14 @@
                         <span>Mula Tonton Episod #{{ $firstEpNum }}</span>
                     </a>
 
+                    <!-- TV Mode Button -->
+                    <a href="{{ route('tv.watch', ['slug' => $drama->slug, 'episode' => $firstEpNum]) }}" 
+                       class="px-5 py-3.5 rounded-full bg-white/10 hover:bg-white/20 text-xs font-bold text-white border border-white/10 transition-colors flex items-center gap-2"
+                       title="Tonton di Pelayar Smart TV / Android TV">
+                        <i data-lucide="tv" class="w-4 h-4 text-red-500"></i>
+                        <span>Strim TV</span>
+                    </a>
+
                     <!-- Trailer Button (Ciri 8) -->
                     @if(!empty($drama->trailer_url))
                         <button type="button" @click="trailerModal = true" class="px-5 py-3.5 rounded-full bg-white/10 hover:bg-white/20 text-xs font-bold text-white border border-white/10 transition-colors flex items-center gap-2">

@@ -107,6 +107,10 @@
                     <a href="{{ route('home') }}" class="hover:text-white transition-colors {{ request()->routeIs('home') ? 'text-white font-bold' : '' }}">Utama</a>
                     <a href="/?tab=trends" class="hover:text-white transition-colors">Trending</a>
                     <a href="/?tab=popular" class="hover:text-white transition-colors">Popular</a>
+                    <a href="{{ route('tv.index') }}" class="hover:text-white text-slate-300 transition-colors flex items-center gap-1.5 {{ request()->routeIs('tv.*') ? 'text-white font-bold' : '' }}">
+                        <i data-lucide="tv" class="w-4 h-4 text-red-500"></i>
+                        <span>TV Mode</span>
+                    </a>
                     <a href="{{ route('creator.dashboard') }}" class="hover:text-white text-slate-400 transition-colors {{ request()->routeIs('creator.*') ? 'text-white font-bold' : '' }}">Studio Creator</a>
                 </nav>
             </div>
@@ -240,6 +244,12 @@
                                     <span>Langgan Pas VIP (RM5)</span>
                                 </a>
                             @endif
+
+                            <a href="{{ route('tv.index') }}" 
+                               class="flex items-center gap-2.5 px-3 py-2 rounded-xl text-slate-200 hover:bg-white/10 hover:text-white transition-colors">
+                                <i data-lucide="tv" class="w-4 h-4 text-red-500"></i>
+                                <span>Mod Pelayar TV (/tv)</span>
+                            </a>
 
                             <div class="border-t border-white/10 pt-1">
                                 <form action="{{ route('logout') }}" method="POST">

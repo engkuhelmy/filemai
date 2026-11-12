@@ -47,6 +47,12 @@
     <!-- YouTube IFrame Player API -->
     <script src="https://www.youtube.com/iframe_api"></script>
 
+    <!-- Google Cast SDK (Web Sender) -->
+    <script src="https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1"></script>
+
+    <!-- HLS.js for Adaptive Bitrate Streaming on HTML5 Video -->
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+
     <!-- Alpine.js -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js"></script>
 
@@ -117,8 +123,11 @@
 </head>
 <body class="bg-black text-white min-h-screen flex items-center justify-center font-sans relative"
       x-data="tiktokDramaPlayer({
+          dramaId: {{ (int)$drama->id }},
+          episodeId: {{ (int)$episode->id }},
           dramaSlug: '{{ $drama->slug }}',
           dramaTitle: '{{ addslashes($drama->title) }}',
+          episodeTitle: '{{ addslashes($episode->title) }}',
           currentEpisodeNumber: {{ (int)$episode->episode_number }},
           totalEpisodes: {{ count($allEpisodes) }},
           nextUrl: {{ $nextEpisode ? json_encode(route('episodes.show', ['drama' => $drama->slug, 'episode' => $nextEpisode->episode_number])) : 'null' }},
@@ -127,7 +136,11 @@
           prevEpisodeNumber: {{ $prevEpisode ? (int)$prevEpisode->episode_number : 'null' }},
           youtubeId: '{{ $episode->effective_youtube_id ?? '' }}',
           videoUrl: '{{ $episode->video_url ?? '' }}',
-          isYouTube: {{ $episode->isYouTube() ? 'true' : 'false' }}
+          isYouTube: {{ $episode->isYouTube() ? 'true' : 'false' }},
+          resumeSeconds: {{ ($progress && $progress->progress_seconds > 5 && !$progress->completed) ? (int)$progress->progress_seconds : 0 }},
+          totalDuration: {{ (int)($episode->duration ?: 60) }},
+          posterUrl: '{{ $episode->thumbnail_url ?: ($drama->banner_url ?: $drama->poster_url) }}',
+          sessionId: '{{ session()->getId() }}'
       })"
       @keydown.window="handleKeyDown($event)"
       @wheel.window="handleWheel($event)">
@@ -164,7 +177,7 @@
                     </iframe>
                 </div>
             @elseif (!empty($episode->video_url))
-                <!-- Direct Video Storage Fallback -->
+                <!-- Direct Video Storage Fallback with Adaptive HLS & AirPlay -->
                 <video x-ref="directVideo"
                        id="directVideo"
                        class="w-full h-full object-cover"
@@ -172,8 +185,11 @@
                        autoplay
                        playsinline
                        webkit-playsinline
+                       x-webkit-airplay="allow"
+                       airplay="allow"
                        loop
                        poster="{{ $bgPoster }}"
+                       @timeupdate="onDirectTimeUpdate($event)"
                        @click="toggleDirectPlay()">
                 </video>
             @else
@@ -253,6 +269,68 @@
             </div>
         </div>
 
+        <!-- TV Casting Active HUD Status -->
+        <div x-show="isCasting"
+             x-cloak
+             x-transition:enter="transition ease-out duration-300"
+             x-transition:enter-start="-translate-y-4 opacity-0"
+             x-transition:enter-end="translate-y-0 opacity-100"
+             class="relative z-30 mx-4 mt-1 p-2.5 rounded-2xl bg-black/85 backdrop-blur-xl border border-red-500/60 shadow-2xl flex items-center justify-between gap-2 pointer-events-auto">
+            <div class="flex items-center gap-2 min-w-0">
+                <span class="relative flex h-2.5 w-2.5 shrink-0">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+                </span>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-black text-white truncate flex items-center gap-1">
+                        <span>📺 Menstrim ke TV</span>
+                        <span class="text-red-400" x-show="castDeviceName" x-text="'(' + castDeviceName + ')'"></span>
+                    </p>
+                    <p class="text-[9px] text-slate-300 truncate">Kawalan playback disegerakkan dengan TV</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-1.5 shrink-0">
+                <button @click="toggleCastPlay()" 
+                        class="p-1 px-2 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[10px] font-bold flex items-center gap-1">
+                    <span x-text="castPaused ? '▶ Sambung' : '⏸ Jeda'"></span>
+                </button>
+                <button @click="stopCasting()" 
+                        class="p-1 px-2 rounded-lg bg-red-600/30 hover:bg-red-600/50 text-red-200 border border-red-500/40 text-[10px] font-bold">
+                    Tamat
+                </button>
+            </div>
+        </div>
+
+        <!-- Resume Playback Toast Prompt ("Sambung Tonton?") -->
+        <div x-show="showResumePrompt"
+             x-cloak
+             x-transition:enter="transition ease-out duration-300"
+             x-transition:enter-start="-translate-y-4 opacity-0"
+             x-transition:enter-end="translate-y-0 opacity-100"
+             x-transition:leave="transition ease-in duration-200"
+             x-transition:leave-start="translate-y-0 opacity-100"
+             x-transition:leave-end="-translate-y-4 opacity-0"
+             class="relative z-30 mx-4 mt-1 p-2.5 rounded-2xl bg-[#0f121a]/95 backdrop-blur-xl border border-amber-500/50 shadow-2xl flex items-center justify-between gap-2 pointer-events-auto">
+            <div class="flex items-center gap-2 min-w-0">
+                <div class="w-7 h-7 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+                    <i data-lucide="history" class="w-4 h-4"></i>
+                </div>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-extrabold text-white truncate">Sambung Tonton?</p>
+                    <p class="text-[9px] text-slate-300">Dari saat <strong class="text-amber-400" x-text="formatSeconds(resumeSeconds)">00:00</strong></p>
+                </div>
+            </div>
+            <div class="flex items-center gap-1.5 shrink-0">
+                <button @click="dismissResume()" class="px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-slate-300 text-[10px] font-medium">
+                    Awal
+                </button>
+                <button @click="applyResume()" class="px-2.5 py-1 rounded-lg bg-[#E50914] hover:bg-red-600 text-white text-[10px] font-black shadow flex items-center gap-1">
+                    <i data-lucide="play" class="w-2.5 h-2.5 fill-current"></i>
+                    <span>Sambung</span>
+                </button>
+            </div>
+        </div>
+
         <!-- 11. Creator Notice Board Announcement Overlay (If Any) -->
         @if(!empty($drama->announcement))
             <div class="relative z-20 mx-4 -mt-2 mb-2 py-1.5 px-3 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[11px] flex items-center gap-2 pointer-events-auto backdrop-blur-md">
@@ -286,7 +364,18 @@
                 <span class="text-[10px] font-bold text-white tracking-wide shadow-sm">Episod</span>
             </button>
 
-            <!-- 3. Like Button with Tap Heart Animation -->
+            <!-- 3. Smart TV / Cast Button (Chromecast & AirPlay) -->
+            <button @click="openCastModal()"
+                    class="group flex flex-col items-center gap-1"
+                    title="Strim ke TV & Skrin Besar">
+                <div class="w-11 h-11 rounded-full bg-black/65 backdrop-blur-md border border-white/20 group-hover:border-red-500/80 group-hover:bg-red-600/20 flex items-center justify-center text-white shadow-xl transition-all group-hover:scale-110"
+                     :class="isCasting ? 'bg-red-600 border-red-400 ring-2 ring-red-400/50 animate-pulse' : ''">
+                    <i data-lucide="tv" class="w-5 h-5" :class="isCasting ? 'text-white' : 'text-amber-400'"></i>
+                </div>
+                <span class="text-[10px] font-bold text-white tracking-wide shadow-sm" x-text="isCasting ? 'Casting' : 'Strim TV'">Strim TV</span>
+            </button>
+
+            <!-- 4. Like Button with Tap Heart Animation -->
             <button @click="toggleLike()"
                     class="group flex flex-col items-center gap-1">
                 <div class="w-11 h-11 rounded-full bg-black/65 backdrop-blur-md border border-white/20 flex items-center justify-center text-white shadow-xl transition-all group-hover:scale-110"
@@ -298,7 +387,7 @@
                 <span class="text-[10px] font-bold text-white" x-text="likeCountFormatted">12.4K</span>
             </button>
 
-            <!-- 4. Share Button -->
+            <!-- 5. Share Button -->
             <button @click="shareEpisode()"
                     class="group flex flex-col items-center gap-1">
                 <div class="w-11 h-11 rounded-full bg-black/65 backdrop-blur-md border border-white/20 flex items-center justify-center text-white shadow-xl transition-all group-hover:scale-110">
@@ -307,7 +396,7 @@
                 <span class="text-[10px] font-bold text-white">Kongsi</span>
             </button>
 
-            <!-- 5. Next Episode Quick Trigger -->
+            <!-- 6. Next Episode Quick Trigger -->
             @if ($nextEpisode)
                 <button @click="goNext()"
                         title="Episod Seterusnya (Swipe Up)"
@@ -464,6 +553,129 @@
 
         </div>
 
+        <!-- ======================================================== -->
+        <!-- SMART TV CASTING DRAWER (CHROMECAST, AIRPLAY & TV MODE)  -->
+        <!-- ======================================================== -->
+        <div x-show="castModalOpen"
+             x-cloak
+             x-transition:enter="transition ease-out duration-300"
+             x-transition:enter-start="translate-y-full opacity-0"
+             x-transition:enter-end="translate-y-0 opacity-100"
+             x-transition:leave="transition ease-in duration-200"
+             x-transition:leave-start="translate-y-0 opacity-100"
+             x-transition:leave-end="translate-y-full opacity-0"
+             class="absolute inset-x-0 bottom-0 z-50 max-h-[85%] bg-[#0e1015]/98 backdrop-blur-2xl border-t border-white/15 rounded-t-3xl p-5 flex flex-col shadow-2xl pointer-events-auto"
+             style="display: none;"
+             @click.outside="castModalOpen = false">
+
+            <!-- Drawer Header -->
+            <div class="flex items-center justify-between border-b border-white/10 pb-3 mb-4">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-9 h-9 rounded-2xl bg-red-600/20 border border-red-500/30 flex items-center justify-center text-[#E50914]">
+                        <i data-lucide="tv" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-extrabold text-white">Strim ke TV & Skrin Besar</h3>
+                        <p class="text-[11px] text-slate-400">Pilih kaedah penstriman skrin pilihan anda</p>
+                    </div>
+                </div>
+
+                <button @click="castModalOpen = false" 
+                        class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-slate-300 hover:text-white transition-colors">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+
+            <!-- Cast Options List -->
+            <div class="space-y-2.5 overflow-y-auto no-scrollbar max-h-[55vh]">
+                
+                <!-- 1. Google Cast / Chromecast -->
+                <div class="p-3.5 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 transition-all flex items-center justify-between gap-3 cursor-pointer"
+                     @click="castToChromecast()">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 shrink-0">
+                            <i data-lucide="cast" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <h4 class="text-xs font-bold text-white flex items-center gap-1.5">
+                                <span>Google Cast / Chromecast</span>
+                                <span class="px-1.5 py-0.2 rounded text-[9px] font-black bg-blue-500/20 text-blue-300 border border-blue-500/30">Google TV</span>
+                            </h4>
+                            <p class="text-[10px] text-slate-400 mt-0.5">Android TV, Google TV, Chromecast, Mi TV Box</p>
+                        </div>
+                    </div>
+                    <div class="shrink-0 flex items-center gap-1.5">
+                        <span class="px-2.5 py-1 rounded-full bg-blue-600/20 text-blue-300 border border-blue-500/30 text-[10px] font-bold">Sambung</span>
+                    </div>
+                </div>
+
+                <!-- 2. Apple AirPlay -->
+                <div class="p-3.5 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 transition-all flex items-center justify-between gap-3 cursor-pointer"
+                     @click="castToAirPlay()">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-slate-700/30 border border-white/20 flex items-center justify-center text-white shrink-0">
+                            <i data-lucide="airplay" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <h4 class="text-xs font-bold text-white flex items-center gap-1.5">
+                                <span>Apple AirPlay</span>
+                                <span class="px-1.5 py-0.2 rounded text-[9px] font-black bg-white/10 text-white border border-white/20">iOS / macOS</span>
+                            </h4>
+                            <p class="text-[10px] text-slate-400 mt-0.5">Apple TV, Samsung & LG Smart TV dengan AirPlay 2</p>
+                        </div>
+                    </div>
+                    <div class="shrink-0">
+                        <span class="px-2.5 py-1 rounded-full bg-white/10 text-[10px] font-bold text-slate-300">Papar</span>
+                    </div>
+                </div>
+
+                <!-- 3. Smart TV Leanback Mode -->
+                <a href="{{ route('tv.watch', ['slug' => $drama->slug, 'episode' => $episode->episode_number]) }}"
+                   class="p-3.5 rounded-2xl bg-gradient-to-r from-red-950/40 via-red-900/20 to-black hover:from-red-950/60 border border-red-500/30 transition-all flex items-center justify-between gap-3">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-red-600/20 border border-red-500/40 flex items-center justify-center text-red-500 shrink-0">
+                            <i data-lucide="monitor" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <h4 class="text-xs font-bold text-white flex items-center gap-1.5">
+                                <span>Mod TV Pintar (Leanback UI)</span>
+                                <span class="px-1.5 py-0.2 rounded text-[9px] font-black bg-red-600/30 text-red-300 border border-red-500/40">D-Pad Ready</span>
+                            </h4>
+                            <p class="text-[10px] text-slate-300 mt-0.5">Paparan skrin penuh untuk pelayar Android TV / WebOS / Tizen</p>
+                        </div>
+                    </div>
+                    <div class="shrink-0">
+                        <i data-lucide="chevron-right" class="w-4 h-4 text-red-400"></i>
+                    </div>
+                </a>
+
+                <!-- 4. Quick Portal TV Link -->
+                <div class="p-3 rounded-xl bg-white/[0.03] border border-white/5 text-[11px] text-slate-400 space-y-1.5">
+                    <div class="flex items-center justify-between">
+                        <span class="font-bold text-white flex items-center gap-1">
+                            <i data-lucide="wifi" class="w-3.5 h-3.5 text-emerald-400"></i>
+                            Pautan Pelayar Smart TV
+                        </span>
+                        <button @click="copyTvUrl()" class="text-red-400 hover:text-red-300 font-bold text-[10px] flex items-center gap-0.5">
+                            <i data-lucide="copy" class="w-3 h-3"></i>
+                            <span x-text="tvUrlCopied ? 'Disalin!' : 'Salin Pautan'">Salin Pautan</span>
+                        </button>
+                    </div>
+                    <p class="text-[10px] leading-relaxed">
+                        Buka pautan <code class="px-1.5 py-0.5 rounded bg-black text-amber-300 font-mono">filemai.my/tv</code> pada mana-mana pelayar TV anda untuk navigasi menggunakan kawalan jauh (remote).
+                    </p>
+                </div>
+
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="pt-3 mt-3 border-t border-white/10 flex items-center justify-between text-[11px] text-slate-400">
+                <span>Auto-segerak masa & sejarah tontonan</span>
+                <button @click="castModalOpen = false" class="text-white font-bold hover:underline">Tutup</button>
+            </div>
+
+        </div>
+
     </div>
 
     <!-- ======================================================== -->
@@ -501,12 +713,30 @@
         Pautan berjaya disalin ke papan keratan!
     </div>
 
-    <!-- Alpine.js TikTok Drama Controller -->
+    <!-- Alpine.js TikTok Drama Controller with Smart TV Casting -->
     <script>
+        // Global Google Cast SDK receiver hook
+        window['__onGCastApiAvailable'] = function(isAvailable) {
+            if (isAvailable && window.cast && window.cast.framework) {
+                try {
+                    window.cast.framework.CastContext.getInstance().setOptions({
+                        receiverApplicationId: chrome.cast.media.DEFAULT_MEDIA_RECEIVER_APP_ID,
+                        autoJoinPolicy: chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED
+                    });
+                    console.log('[Filemai Cast] Google Cast SDK initialized.');
+                } catch (e) {
+                    console.warn('[Filemai Cast] Init warning:', e);
+                }
+            }
+        };
+
         function tiktokDramaPlayer(config) {
             return {
+                dramaId: config.dramaId,
+                episodeId: config.episodeId,
                 dramaSlug: config.dramaSlug,
                 dramaTitle: config.dramaTitle,
+                episodeTitle: config.episodeTitle,
                 currentEp: config.currentEpisodeNumber,
                 totalEpisodes: config.totalEpisodes,
                 nextUrl: config.nextUrl,
@@ -516,14 +746,35 @@
                 youtubeId: config.youtubeId,
                 videoUrl: config.videoUrl,
                 isYouTube: config.isYouTube,
+                resumeSeconds: config.resumeSeconds || 0,
+                totalDuration: config.totalDuration || 60,
+                posterUrl: config.posterUrl || '',
+                sessionId: config.sessionId || '',
 
                 // State
                 episodeDrawerOpen: false,
+                castModalOpen: false,
                 liked: false,
                 likeCount: 12400 + Math.floor(Math.random() * 200),
                 startY: 0,
                 endY: 0,
                 isWheelThrottled: false,
+
+                // Casting State
+                isCasting: false,
+                castDeviceName: '',
+                castPaused: false,
+                castSession: null,
+                remotePlayer: null,
+                remotePlayerController: null,
+                tvUrlCopied: false,
+
+                // Resume Playback State
+                showResumePrompt: false,
+                currentPlaybackTime: 0,
+                lastReportedProgress: 0,
+                progressInterval: null,
+                hls: null,
 
                 get likeCountFormatted() {
                     return (this.likeCount / 1000).toFixed(1) + 'K';
@@ -539,13 +790,292 @@
                     if (localStorage.getItem(likeKey) === 'true') {
                         this.liked = true;
                     }
+
+                    // Check if resume timestamp exists
+                    if (this.resumeSeconds > 5) {
+                        this.showResumePrompt = true;
+                        // Auto-dismiss resume prompt after 12 seconds
+                        setTimeout(() => {
+                            this.showResumePrompt = false;
+                        }, 12000);
+                    }
+
+                    // Setup adaptive HLS.js if video is an HLS playlist
+                    this.setupAdaptiveStreaming();
+
+                    // Setup Cast SDK listeners
+                    this.setupCastListeners();
+
+                    // Setup AirPlay target availability listeners
+                    this.setupAirPlayListeners();
+
+                    // Setup periodic watch progress heartbeat (every 8s)
+                    this.progressInterval = setInterval(() => {
+                        this.syncWatchProgress();
+                    }, 8000);
+
+                    // Flush progress on tab close / navigate away
+                    window.addEventListener('beforeunload', () => {
+                        this.syncWatchProgress(true);
+                    });
+                },
+
+                setupAdaptiveStreaming() {
+                    const video = this.$refs.directVideo;
+                    if (!video || !this.videoUrl) return;
+
+                    // If URL is .m3u8 and HLS.js is supported
+                    if (this.videoUrl.includes('.m3u8')) {
+                        if (window.Hls && window.Hls.isSupported()) {
+                            this.hls = new Hls({
+                                maxBufferLength: 30,
+                                enableWorker: true
+                            });
+                            this.hls.loadSource(this.videoUrl);
+                            this.hls.attachMedia(video);
+                            this.hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                                video.play().catch(() => {});
+                            });
+                        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                            // Native Safari HLS
+                            video.src = this.videoUrl;
+                        }
+                    }
+                },
+
+                setupCastListeners() {
+                    if (window.cast && window.cast.framework) {
+                        try {
+                            const context = window.cast.framework.CastContext.getInstance();
+                            this.remotePlayer = new window.cast.framework.RemotePlayer();
+                            this.remotePlayerController = new window.cast.framework.RemotePlayerController(this.remotePlayer);
+
+                            this.remotePlayerController.addEventListener(
+                                window.cast.framework.RemotePlayerEventType.IS_CONNECTED_CHANGED,
+                                () => {
+                                    this.isCasting = this.remotePlayer.isConnected;
+                                    if (this.isCasting) {
+                                        const session = context.getCurrentSession();
+                                        this.castDeviceName = session ? session.getCastDevice().friendlyName : 'Smart TV';
+                                        this.castSession = session;
+                                        // Pause local video to avoid double playback
+                                        const localVideo = this.$refs.directVideo;
+                                        if (localVideo) localVideo.pause();
+                                    } else {
+                                        this.castDeviceName = '';
+                                        this.castSession = null;
+                                    }
+                                }
+                            );
+
+                            this.remotePlayerController.addEventListener(
+                                window.cast.framework.RemotePlayerEventType.IS_PAUSED_CHANGED,
+                                () => {
+                                    this.castPaused = this.remotePlayer.isPaused;
+                                }
+                            );
+
+                            this.remotePlayerController.addEventListener(
+                                window.cast.framework.RemotePlayerEventType.CURRENT_TIME_CHANGED,
+                                () => {
+                                    if (this.remotePlayer && this.remotePlayer.currentTime) {
+                                        this.currentPlaybackTime = Math.floor(this.remotePlayer.currentTime);
+                                    }
+                                }
+                            );
+                        } catch (err) {
+                            console.warn('[Filemai Cast] Listener registration:', err);
+                        }
+                    }
+                },
+
+                setupAirPlayListeners() {
+                    const video = this.$refs.directVideo;
+                    if (video && window.WebKitPlaybackTargetAvailabilityEvent) {
+                        video.addEventListener('webkitplaybacktargetavailabilitychanged', (event) => {
+                            console.log('[Filemai AirPlay] Target availability:', event.availability);
+                        });
+                        video.addEventListener('webkitcurrentplaybacktargetiswirelesschanged', () => {
+                            const isWireless = video.webkitCurrentPlaybackTargetIsWireless;
+                            this.isCasting = isWireless;
+                            this.castDeviceName = isWireless ? 'AirPlay TV' : '';
+                        });
+                    }
                 },
 
                 openEpisodeDrawer() {
                     this.episodeDrawerOpen = true;
+                    this.castModalOpen = false;
                     this.$nextTick(() => {
                         if (window.lucide) window.lucide.createIcons();
                     });
+                },
+
+                openCastModal() {
+                    this.castModalOpen = true;
+                    this.episodeDrawerOpen = false;
+                    this.$nextTick(() => {
+                        if (window.lucide) window.lucide.createIcons();
+                    });
+                },
+
+                castToChromecast() {
+                    if (!window.cast || !window.cast.framework) {
+                        alert('Google Cast SDK belum sedia atau peranti anda belum menyokong Google Cast. Sila gunakan pelayar Google Chrome.');
+                        return;
+                    }
+
+                    const context = window.cast.framework.CastContext.getInstance();
+                    context.requestSession().then(() => {
+                        const session = context.getCurrentSession();
+                        if (!session) return;
+
+                        this.castSession = session;
+                        this.castDeviceName = session.getCastDevice().friendlyName || 'Smart TV';
+                        this.isCasting = true;
+                        this.castModalOpen = false;
+
+                        // Build cast media info
+                        const mediaUrl = this.videoUrl || (this.youtubeId ? `https://www.youtube.com/watch?v=${this.youtubeId}` : '');
+                        const contentType = this.videoUrl && this.videoUrl.endsWith('.m3u8') ? 'application/x-mpegURL' : 'video/mp4';
+
+                        const mediaInfo = new chrome.cast.media.MediaInfo(mediaUrl, contentType);
+                        mediaInfo.metadata = new chrome.cast.media.GenericMediaMetadata();
+                        mediaInfo.metadata.metadataType = chrome.cast.media.MetadataType.GENERIC;
+                        mediaInfo.metadata.title = this.dramaTitle + ' - ' + this.episodeTitle;
+                        mediaInfo.metadata.subtitle = 'Episod ' + this.currentEp + ' • Filemai.my';
+                        if (this.posterUrl) {
+                            mediaInfo.metadata.images = [{ url: this.posterUrl }];
+                        }
+
+                        const request = new chrome.cast.media.LoadRequest(mediaInfo);
+                        request.currentTime = this.currentPlaybackTime || this.resumeSeconds || 0;
+                        request.autoplay = true;
+
+                        session.loadMedia(request).then(() => {
+                            console.log('[Filemai Cast] Strim dimulakan pada skrin TV!');
+                        }).catch((err) => {
+                            console.error('[Filemai Cast] Ralat memuatkan media:', err);
+                        });
+                    }).catch((err) => {
+                        console.warn('[Filemai Cast] Session cancelled / error:', err);
+                    });
+                },
+
+                castToAirPlay() {
+                    const video = this.$refs.directVideo;
+                    if (video && typeof video.webkitShowPlaybackTargetPicker === 'function') {
+                        video.webkitShowPlaybackTargetPicker();
+                        this.castModalOpen = false;
+                    } else if (video && video.remote && typeof video.remote.prompt === 'function') {
+                        // W3C Remote Playback API
+                        video.remote.prompt().then(() => {
+                            this.isCasting = true;
+                            this.castDeviceName = 'Smart TV';
+                            this.castModalOpen = false;
+                        }).catch(() => {});
+                    } else {
+                        alert('AirPlay disokong secara rasmi pada pelayar Safari di peranti Apple (iPhone, iPad, Mac) atau Smart TV bersambung AirPlay 2.');
+                    }
+                },
+
+                stopCasting() {
+                    if (this.castSession) {
+                        try {
+                            const context = window.cast.framework.CastContext.getInstance();
+                            context.endCurrentSession(true);
+                        } catch (e) {}
+                    }
+                    this.isCasting = false;
+                    this.castDeviceName = '';
+                },
+
+                toggleCastPlay() {
+                    if (this.remotePlayerController && this.isCasting) {
+                        this.remotePlayerController.playOrPause();
+                    } else {
+                        this.toggleDirectPlay();
+                    }
+                },
+
+                // Resume Playback Logic
+                applyResume() {
+                    const seekTarget = parseInt(this.resumeSeconds, 10);
+                    if (seekTarget > 0) {
+                        const video = this.$refs.directVideo;
+                        if (video) {
+                            video.currentTime = seekTarget;
+                            video.play().catch(() => {});
+                        }
+                        this.currentPlaybackTime = seekTarget;
+                    }
+                    this.showResumePrompt = false;
+                },
+
+                dismissResume() {
+                    this.showResumePrompt = false;
+                    const video = this.$refs.directVideo;
+                    if (video) {
+                        video.currentTime = 0;
+                        video.play().catch(() => {});
+                    }
+                },
+
+                onDirectTimeUpdate(e) {
+                    const video = e.target;
+                    if (video && video.currentTime) {
+                        this.currentPlaybackTime = Math.floor(video.currentTime);
+                        if (video.duration) {
+                            this.totalDuration = Math.floor(video.duration);
+                        }
+                    }
+                },
+
+                syncWatchProgress(isBeacon = false) {
+                    const time = this.currentPlaybackTime;
+                    if (time <= 0 || time === this.lastReportedProgress) return;
+
+                    this.lastReportedProgress = time;
+                    const payload = {
+                        drama_id: this.dramaId,
+                        episode_id: this.episodeId,
+                        progress_seconds: time,
+                        duration_seconds: this.totalDuration || 60,
+                        session_id: this.sessionId
+                    };
+
+                    const endpoint = '/api/tv/playback/progress';
+
+                    if (isBeacon && navigator.sendBeacon) {
+                        const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+                        navigator.sendBeacon(endpoint, blob);
+                    } else {
+                        fetch(endpoint, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest'
+                            },
+                            body: JSON.stringify(payload)
+                        }).catch(() => {});
+                    }
+                },
+
+                copyTvUrl() {
+                    const tvUrl = window.location.origin + '/tv/watch/' + this.dramaSlug + '/' + this.currentEp;
+                    navigator.clipboard.writeText(tvUrl);
+                    this.tvUrlCopied = true;
+                    setTimeout(() => {
+                        this.tvUrlCopied = false;
+                    }, 2500);
+                },
+
+                formatSeconds(sec) {
+                    const s = parseInt(sec, 10) || 0;
+                    const mins = Math.floor(s / 60);
+                    const remainder = s % 60;
+                    return (mins < 10 ? '0' : '') + mins + ':' + (remainder < 10 ? '0' : '') + remainder;
                 },
 
                 toggleLike() {
@@ -578,17 +1108,17 @@
 
                 // Gesture: Touch Swipe Up (Next) & Swipe Down (Prev)
                 handleTouchStart(e) {
-                    if (this.episodeDrawerOpen) return;
+                    if (this.episodeDrawerOpen || this.castModalOpen) return;
                     this.startY = e.touches[0].clientY;
                 },
 
                 handleTouchMove(e) {
-                    if (this.episodeDrawerOpen) return;
+                    if (this.episodeDrawerOpen || this.castModalOpen) return;
                     this.endY = e.touches[0].clientY;
                 },
 
                 handleTouchEnd(e) {
-                    if (this.episodeDrawerOpen) return;
+                    if (this.episodeDrawerOpen || this.castModalOpen) return;
                     if (!this.startY || !this.endY) return;
 
                     const deltaY = this.startY - this.endY;
@@ -608,7 +1138,7 @@
 
                 // Gesture: Mouse Wheel Scroll Up / Down
                 handleWheel(e) {
-                    if (this.episodeDrawerOpen || this.isWheelThrottled) return;
+                    if (this.episodeDrawerOpen || this.castModalOpen || this.isWheelThrottled) return;
 
                     if (e.deltaY > 50) {
                         // Scroll DOWN -> Next Episode
@@ -625,8 +1155,11 @@
 
                 // Keyboard Arrow Down / Up
                 handleKeyDown(e) {
-                    if (this.episodeDrawerOpen) {
-                        if (e.key === 'Escape') this.episodeDrawerOpen = false;
+                    if (this.episodeDrawerOpen || this.castModalOpen) {
+                        if (e.key === 'Escape') {
+                            this.episodeDrawerOpen = false;
+                            this.castModalOpen = false;
+                        }
                         return;
                     }
 
@@ -640,6 +1173,7 @@
                 },
 
                 goNext() {
+                    this.syncWatchProgress(true);
                     if (this.nextUrl) {
                         window.location.href = this.nextUrl;
                     } else {
@@ -648,6 +1182,7 @@
                 },
 
                 goPrev() {
+                    this.syncWatchProgress(true);
                     if (this.prevUrl) {
                         window.location.href = this.prevUrl;
                     }

@@ -270,3 +270,10 @@ Route::post('/api/episodes/{episode}/track-watch', function (Episode $episode, R
     $result = \App\Models\CreatorWallet::recordViewEarnings($drama, $episode, $duration);
     return response()->json($result);
 });
+
+// Dedicated Android TV & Smart TV Leanback Routes
+Route::get('/tv', [\App\Http\Controllers\TvController::class, 'index'])->name('tv.index');
+Route::get('/tv/watch/{slug}/{episode?}', [\App\Http\Controllers\TvController::class, 'watch'])->name('tv.watch');
+
+// Web-session route for TV Playback Progress
+Route::post('/api/tv/playback/progress', [\App\Http\Controllers\Api\TvApiController::class, 'saveProgress']);
