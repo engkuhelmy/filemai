@@ -18,8 +18,27 @@ class EpisodeWatchController extends Controller
      * Enforces VIP ad-free logic, random active interstitial ad for free viewers,
      * next episode auto-advancement, and episode playlist.
      */
-    public function show(Drama $drama, Episode $episode, Request $request): View
+    public function show(Drama $drama, $episode, Request $request): View
     {
+        // Resolve episode by episode_number (e.g. 1, 2, 3) or by primary key ID
+        if (!($episode instanceof Episode)) {
+            $episodeModel = $drama->episodes()
+                ->where('episode_number', $episode)
+                ->first();
+
+            if (!$episodeModel && is_numeric($episode)) {
+                $episodeModel = $drama->episodes()
+                    ->where('id', (int)$episode)
+                    ->first();
+            }
+
+            if (!$episodeModel) {
+                abort(404, "Episod #{$episode} tidak ditemui untuk siri drama ini.");
+            }
+
+            $episode = $episodeModel;
+        }
+
         // Ensure episode belongs to this drama
         if ((int)$episode->drama_id !== (int)$drama->id) {
             abort(404, 'Episod tidak sah untuk drama ini.');

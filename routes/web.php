@@ -83,7 +83,17 @@ Route::get('/drama/{drama:slug}/episode/{episode}', [EpisodeWatchController::cla
     ->name('episodes.show');
 
 // Friendly Direct Episode Watch URL: /watch/{episode}
-Route::get('/watch/{episode}', function (Episode $episode) {
+Route::get('/watch/{episode}', function ($episode) {
+    if (!($episode instanceof Episode)) {
+        $ep = is_numeric($episode) ? Episode::find($episode) : null;
+        if (!$ep) {
+            $ep = Episode::where('episode_number', $episode)->first();
+        }
+        if (!$ep) {
+            abort(404, 'Episod tidak ditemui.');
+        }
+        $episode = $ep;
+    }
     $drama = $episode->drama;
     if (!$drama) {
         abort(404, 'Drama untuk episod ini tidak ditemui.');
