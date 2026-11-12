@@ -100,3 +100,4 @@ class PlaybackProgress extends Model
         return $query->orderBy('last_watched_at', 'desc')->first();
     }
 }
+

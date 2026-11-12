@@ -20,3 +20,4 @@ Route::prefix('tv')->group(function () {
     Route::get('/episodes/{episode}', [TvApiController::class, 'showEpisode']);
     Route::post('/playback/progress', [TvApiController::class, 'saveProgress']);
 });
+
