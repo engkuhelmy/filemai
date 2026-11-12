@@ -23,3 +23,4 @@ return new class extends Migration
         DB::statement("ALTER TABLE dramas MODIFY COLUMN status ENUM('pending','published','rejected') DEFAULT 'pending'");
     }
 };
+

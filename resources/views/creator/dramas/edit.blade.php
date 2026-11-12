@@ -37,52 +37,10 @@
         }
     },
 
-    async confirmDeleteDrama() {
+    confirmDeleteDrama() {
         this.isDeleting = true;
-        try {
-            const response = await fetch('{{ route('creator.dramas.destroy', $drama) }}', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
-                    'X-Requested-With': 'XMLHttpRequest'
-                },
-                body: JSON.stringify({
-                    _method: 'DELETE'
-                })
-            });
-
-            const result = await response.json().catch(() => null);
-
-            if (response.ok) {
-                this.showToast('Siri drama berjaya dipadam. Mengalihkan ke papan pemuka...', 'success');
-                setTimeout(() => {
-                    window.location.href = (result && result.redirect_url) ? result.redirect_url : '{{ route('creator.dashboard') }}';
-                }, 800);
-            } else {
-                this.showToast((result && result.message) ? result.message : 'Gagal memadam drama. Sila cuba lagi.', 'error');
-                this.isDeleting = false;
-            }
-        } catch (error) {
-            // Fallback to native form POST with _method=DELETE
-            const form = document.createElement('form');
-            form.method = 'POST';
-            form.action = '{{ route('creator.dramas.destroy', $drama) }}';
-            
-            const csrfInput = document.createElement('input');
-            csrfInput.type = 'hidden';
-            csrfInput.name = '_token';
-            csrfInput.value = '{{ csrf_token() }}';
-            form.appendChild(csrfInput);
-
-            const methodInput = document.createElement('input');
-            methodInput.type = 'hidden';
-            methodInput.name = '_method';
-            methodInput.value = 'DELETE';
-            form.appendChild(methodInput);
-
-            document.body.appendChild(form);
+        const form = document.getElementById('deleteDramaForm');
+        if (form) {
             form.submit();
         }
     },
@@ -843,6 +801,12 @@
         </form>
 
     </div>
+
+    <!-- Dedicated Form for Drama Delete Action -->
+    <form id="deleteDramaForm" action="{{ route('creator.dramas.destroy', $drama) }}" method="POST" class="hidden" style="display: none;">
+        @csrf
+        @method('DELETE')
+    </form>
 
     <!-- Confirmation Modal: Padam Drama (Delete Drama Confirmation Dialog) -->
     <div x-show="deleteModalOpen" 
