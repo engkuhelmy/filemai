@@ -163,6 +163,7 @@ Route::middleware(['auth'])->prefix('creator')->name('creator.')->group(function
     // Manage Drama Series
     Route::get('/dramas/{drama}/manage', [CreatorDramaController::class, 'manage'])->name('dramas.manage');
     Route::post('/dramas/{drama}/destroy', [CreatorDramaController::class, 'destroy'])->name('dramas.destroy');
+    Route::delete('/dramas/{drama}', [CreatorDramaController::class, 'destroy']);
 
     // Wallet Overview
     Route::get('/wallet', [\App\Http\Controllers\Creator\WalletController::class, 'index'])->name('wallet');

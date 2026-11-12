@@ -438,11 +438,16 @@ class DramaController extends Controller
             $drama->genres = [$validated['genre']];
         }
 
-        // 7. Status Tayangan Siri
+        // 7. Status Tayangan Siri & Visibiliti Awam (Sembunyikan jika Tamat/Completed)
         if (!empty($validated['release_status'])) {
             $drama->release_status = $validated['release_status'];
-        }
-        if (!empty($validated['status'])) {
+            if ($validated['release_status'] === 'completed') {
+                // Makluman: Drama ini akan disembunyikan daripada paparan awam secara automatik
+                $drama->status = 'draft';
+            } else {
+                $drama->status = $validated['status'] ?? 'published';
+            }
+        } elseif (!empty($validated['status'])) {
             $drama->status = $validated['status'];
         }
 
@@ -505,13 +510,27 @@ class DramaController extends Controller
     /**
      * Delete a drama series and all its associated episodes.
      */
-    public function destroy(Drama $drama): RedirectResponse
+    public function destroy(Request $request, Drama $drama): mixed
     {
         $this->authorizeDrama($drama);
 
         $title = $drama->title;
+
+        // Clean up tracking and cascade dependencies
+        \App\Models\PlaybackProgress::where('drama_id', $drama->id)->delete();
+        \App\Models\EpisodeView::where('drama_id', $drama->id)->delete();
+
+        // Delete all episodes and drama
         $drama->episodes()->delete();
         $drama->delete();
+
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json([
+                'status' => 'success',
+                'message' => "Siri drama '{$title}' dan semua episodnya telah dipadam.",
+                'redirect_url' => route('creator.dashboard'),
+            ]);
+        }
 
         return redirect()
             ->route('creator.dashboard')

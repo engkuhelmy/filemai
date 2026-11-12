@@ -189,6 +189,17 @@
                                 <span class="px-2 py-0.5 rounded text-[10px] font-black bg-red-600/20 text-red-400 border border-red-500/30 uppercase">
                                     {{ $drama->genre }}
                                 </span>
+                                @if ($drama->release_status === 'completed' || $drama->status !== 'published')
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/30 uppercase flex items-center gap-1" title="Drama ini disembunyikan daripada paparan awam">
+                                        <i data-lucide="eye-off" class="w-3 h-3"></i>
+                                        {{ $drama->release_status === 'completed' ? 'Tamat (Tersembunyi)' : 'Draf' }}
+                                    </span>
+                                @else
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 uppercase flex items-center gap-1">
+                                        <i data-lucide="eye" class="w-3 h-3"></i>
+                                        Awam
+                                    </span>
+                                @endif
                                 <span class="text-xs text-slate-400">
                                     {{ $drama->episodes_count ?? $drama->episodes()->count() }} Episod
                                 </span>

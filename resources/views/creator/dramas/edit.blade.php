@@ -10,6 +10,7 @@
     accentColor: '{{ old('accent_color', $drama->effective_accent_color) }}',
     contentFormat: '{{ old('type', $drama->effective_type ?? 'drama') }}',
     releaseStatus: '{{ old('release_status', $drama->release_status ?? 'ongoing') }}',
+    status: '{{ old('status', $drama->status ?? ($drama->release_status === 'completed' ? 'draft' : 'published')) }}',
     ageRating: '{{ old('age_rating', $drama->age_rating ?? '13+') }}',
     trailerUrl: '{{ old('trailer_url', $drama->trailer_url ?? '') }}',
     trailerYoutubeId: '',
@@ -17,11 +18,74 @@
     bannerPreview: '{{ $drama->banner_url }}',
     isBundleEnabled: {{ old('is_bundle_enabled', $drama->is_bundle_enabled) ? 'true' : 'false' }},
 
+    // Delete Drama Modal State
+    deleteModalOpen: false,
+    isDeleting: false,
+
     // Data Extraction states
     isExtracting: false,
     toastMessage: '',
     toastType: '',
     toastTimeout: null,
+
+    handleReleaseStatusChange(newStatus) {
+        this.releaseStatus = newStatus;
+        if (newStatus === 'completed') {
+            this.status = 'draft';
+        } else {
+            this.status = 'published';
+        }
+    },
+
+    async confirmDeleteDrama() {
+        this.isDeleting = true;
+        try {
+            const response = await fetch('{{ route('creator.dramas.destroy', $drama) }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify({
+                    _method: 'DELETE'
+                })
+            });
+
+            const result = await response.json().catch(() => null);
+
+            if (response.ok) {
+                this.showToast('Siri drama berjaya dipadam. Mengalihkan ke papan pemuka...', 'success');
+                setTimeout(() => {
+                    window.location.href = (result && result.redirect_url) ? result.redirect_url : '{{ route('creator.dashboard') }}';
+                }, 800);
+            } else {
+                this.showToast((result && result.message) ? result.message : 'Gagal memadam drama. Sila cuba lagi.', 'error');
+                this.isDeleting = false;
+            }
+        } catch (error) {
+            // Fallback to native form POST with _method=DELETE
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '{{ route('creator.dramas.destroy', $drama) }}';
+            
+            const csrfInput = document.createElement('input');
+            csrfInput.type = 'hidden';
+            csrfInput.name = '_token';
+            csrfInput.value = '{{ csrf_token() }}';
+            form.appendChild(csrfInput);
+
+            const methodInput = document.createElement('input');
+            methodInput.type = 'hidden';
+            methodInput.name = '_method';
+            methodInput.value = 'DELETE';
+            form.appendChild(methodInput);
+
+            document.body.appendChild(form);
+            form.submit();
+        }
+    },
 
     showToast(message, type = 'success') {
         this.toastMessage = message;
@@ -179,6 +243,15 @@
                 </div>
 
                 <div class="flex items-center gap-2">
+                    <!-- Padam Drama Button (Danger / Red Aesthetic) -->
+                    <button type="button" 
+                            @click="deleteModalOpen = true" 
+                            class="px-4 py-2 rounded-xl bg-red-600/15 hover:bg-red-600 text-xs font-bold text-red-400 hover:text-white border border-red-500/30 hover:border-red-600 transition-all flex items-center gap-1.5 shadow-sm group"
+                            title="Padam siri drama ini secara kekal">
+                        <i data-lucide="trash-2" class="w-3.5 h-3.5 text-red-400 group-hover:text-white transition-colors"></i>
+                        <span>Padam Drama</span>
+                    </button>
+
                     <a href="{{ route('drama.show', $drama->slug) }}" target="_blank" class="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-bold text-white border border-white/10 transition-colors flex items-center gap-1.5">
                         <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
                         <span>Lihat Paparan Awam</span>
@@ -324,38 +397,78 @@
                 </div>
 
                 <!-- 7. Status Tayangan Siri (Ongoing / Completed / Hiatus / Upcoming) -->
-                <div class="space-y-2 pt-2">
+                <div class="space-y-3 pt-2">
+                    <!-- Hidden Public Visibility Status Input (Auto-switched by Alpine) -->
+                    <input type="hidden" name="status" :value="status">
+
                     <label class="block text-xs font-bold text-slate-300">
                         Status Tayangan Siri (*Series Release Status*) <span class="text-red-500">*</span>
                     </label>
                     <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
                         <label class="p-3.5 rounded-2xl border cursor-pointer transition-all flex items-center gap-2.5"
-                               :class="releaseStatus === 'ongoing' ? 'bg-red-950/30 border-red-500 text-white shadow-lg' : 'bg-slate-950/60 border-white/10 text-slate-400 hover:border-white/20'">
-                            <input type="radio" name="release_status" value="ongoing" x-model="releaseStatus" class="sr-only">
+                               :class="releaseStatus === 'ongoing' ? 'bg-red-950/30 border-red-500 text-white shadow-lg' : 'bg-slate-950/60 border-white/10 text-slate-400 hover:border-white/20'"
+                               @click="handleReleaseStatusChange('ongoing')">
+                            <input type="radio" name="release_status" value="ongoing" x-model="releaseStatus" @change="handleReleaseStatusChange('ongoing')" class="sr-only">
                             <span class="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse"></span>
                             <div class="text-xs font-bold">Sedang Ditayangkan</div>
                         </label>
 
                         <label class="p-3.5 rounded-2xl border cursor-pointer transition-all flex items-center gap-2.5"
-                               :class="releaseStatus === 'completed' ? 'bg-emerald-950/30 border-emerald-500 text-white shadow-lg' : 'bg-slate-950/60 border-white/10 text-slate-400 hover:border-white/20'">
-                            <input type="radio" name="release_status" value="completed" x-model="releaseStatus" class="sr-only">
+                               :class="releaseStatus === 'completed' ? 'bg-emerald-950/30 border-emerald-500 text-white shadow-lg' : 'bg-slate-950/60 border-white/10 text-slate-400 hover:border-white/20'"
+                               @click="handleReleaseStatusChange('completed')">
+                            <input type="radio" name="release_status" value="completed" x-model="releaseStatus" @change="handleReleaseStatusChange('completed')" class="sr-only">
                             <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
                             <div class="text-xs font-bold">Tamat (Completed)</div>
                         </label>
 
                         <label class="p-3.5 rounded-2xl border cursor-pointer transition-all flex items-center gap-2.5"
-                               :class="releaseStatus === 'hiatus' ? 'bg-amber-950/30 border-amber-500 text-white shadow-lg' : 'bg-slate-950/60 border-white/10 text-slate-400 hover:border-white/20'">
-                            <input type="radio" name="release_status" value="hiatus" x-model="releaseStatus" class="sr-only">
+                               :class="releaseStatus === 'hiatus' ? 'bg-amber-950/30 border-amber-500 text-white shadow-lg' : 'bg-slate-950/60 border-white/10 text-slate-400 hover:border-white/20'"
+                               @click="handleReleaseStatusChange('hiatus')">
+                            <input type="radio" name="release_status" value="hiatus" x-model="releaseStatus" @change="handleReleaseStatusChange('hiatus')" class="sr-only">
                             <span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
                             <div class="text-xs font-bold">Berehat (Hiatus)</div>
                         </label>
 
                         <label class="p-3.5 rounded-2xl border cursor-pointer transition-all flex items-center gap-2.5"
-                               :class="releaseStatus === 'upcoming' ? 'bg-cyan-950/30 border-cyan-500 text-white shadow-lg' : 'bg-slate-950/60 border-white/10 text-slate-400 hover:border-white/20'">
-                            <input type="radio" name="release_status" value="upcoming" x-model="releaseStatus" class="sr-only">
+                               :class="releaseStatus === 'upcoming' ? 'bg-cyan-950/30 border-cyan-500 text-white shadow-lg' : 'bg-slate-950/60 border-white/10 text-slate-400 hover:border-white/20'"
+                               @click="handleReleaseStatusChange('upcoming')">
+                            <input type="radio" name="release_status" value="upcoming" x-model="releaseStatus" @change="handleReleaseStatusChange('upcoming')" class="sr-only">
                             <span class="w-2.5 h-2.5 rounded-full bg-cyan-400"></span>
                             <div class="text-xs font-bold">Akan Datang</div>
                         </label>
+                    </div>
+
+                    <!-- Contextual Feedback / Warning: Auto-Hide Drama on Tamat (Completed) -->
+                    <div x-show="releaseStatus === 'completed'" 
+                         x-cloak
+                         x-transition:enter="transition ease-out duration-300"
+                         x-transition:enter-start="opacity-0 -translate-y-2 scale-98"
+                         x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+                         x-transition:leave="transition ease-in duration-200"
+                         x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+                         x-transition:leave-end="opacity-0 -translate-y-2 scale-98"
+                         class="p-4 rounded-2xl bg-amber-500/15 border border-amber-500/40 text-amber-200 text-xs flex items-start gap-3 shadow-xl backdrop-blur-md">
+                        <div class="p-1.5 rounded-xl bg-amber-500/20 text-amber-400 shrink-0 mt-0.5">
+                            <i data-lucide="eye-off" class="w-4 h-4"></i>
+                        </div>
+                        <div class="space-y-1">
+                            <div class="font-extrabold text-amber-300 flex items-center gap-2">
+                                <span>Makluman: Drama ini akan disembunyikan daripada paparan awam secara automatik.</span>
+                                <span class="px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/30 text-[9px] font-black uppercase tracking-wider">Auto-Hidden</span>
+                            </div>
+                            <p class="text-[11px] text-amber-200/90 leading-relaxed">
+                                Karya yang berstatus <strong>Tamat (Completed)</strong> akan ditukar status visibiliti awamnya kepada <em>Draf / Tersembunyi</em> supaya tidak lagi dipaparkan dalam katalog awam aktif Filemai bagi penonton umum.
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Reassurance feedback when Ongoing -->
+                    <div x-show="releaseStatus === 'ongoing'" 
+                         x-cloak
+                         x-transition
+                         class="p-2.5 rounded-xl bg-emerald-950/30 border border-emerald-500/20 text-emerald-300 text-[11px] flex items-center gap-2">
+                        <i data-lucide="eye" class="w-3.5 h-3.5 text-emerald-400"></i>
+                        <span>Drama ini berstatus aktif dan dipaparkan dalam katalog awam Filemai.</span>
                     </div>
                 </div>
 
@@ -729,6 +842,59 @@
 
         </form>
 
+    </div>
+
+    <!-- Confirmation Modal: Padam Drama (Delete Drama Confirmation Dialog) -->
+    <div x-show="deleteModalOpen" 
+         x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-200"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"
+         @keydown.escape.window="if (!isDeleting) deleteModalOpen = false"
+         style="display: none;">
+        
+        <div class="max-w-md w-full rounded-3xl bg-slate-900 border border-red-500/40 p-6 sm:p-7 shadow-2xl shadow-red-950/60 space-y-5"
+             @click.outside="if (!isDeleting) deleteModalOpen = false">
+            
+            <div class="flex items-start gap-4">
+                <div class="w-12 h-12 rounded-2xl bg-red-600/20 border border-red-500/40 text-red-500 flex items-center justify-center shrink-0">
+                    <i data-lucide="alert-octagon" class="w-6 h-6"></i>
+                </div>
+                <div class="space-y-1">
+                    <h3 class="text-base sm:text-lg font-black text-white">Padam Drama "{{ $drama->title }}"?</h3>
+                    <p class="text-xs text-slate-300 leading-relaxed">
+                        Adakah anda pasti mahu memadamkan drama ini? Semua episod dan data analitik akan terhapus. Tindakan ini tidak boleh dipulihkan.
+                    </p>
+                </div>
+            </div>
+
+            <div class="p-3 rounded-2xl bg-red-950/40 border border-red-500/20 text-[11px] text-red-300 flex items-center gap-2">
+                <i data-lucide="alert-triangle" class="w-4 h-4 shrink-0 text-red-400"></i>
+                <span>Tindakan ini adalah kekal dan tidak dapat diundur.</span>
+            </div>
+
+            <div class="flex items-center justify-end gap-3 pt-2">
+                <button type="button" 
+                        @click="deleteModalOpen = false" 
+                        :disabled="isDeleting"
+                        class="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-xs font-bold text-slate-300 hover:text-white transition-colors">
+                    Batal
+                </button>
+
+                <button type="button" 
+                        @click="confirmDeleteDrama()" 
+                        :disabled="isDeleting"
+                        class="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-xs font-black text-white shadow-lg shadow-red-950/60 flex items-center gap-2 transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed">
+                    <span x-show="isDeleting" class="inline-block animate-spin mr-1">⏳</span>
+                    <i data-lucide="trash-2" class="w-4 h-4" x-show="!isDeleting"></i>
+                    <span x-text="isDeleting ? 'Memadamkan...' : 'Ya, Padam Drama'">Ya, Padam Drama</span>
+                </button>
+            </div>
+        </div>
     </div>
 </div>
 @endsection
